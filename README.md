@@ -38,9 +38,9 @@ cmake --build build --config Release
 cmake -B build
 cmake --build build -j$(nproc)
 ```
-Or with Ninja: `cmake -B build -G Ninja && cmake --build build`
-```
-Requirements:
+Or with Ninja: `cmake -B build -G Ninja && cmake --build build`   
+
+## Requirements:
 Windows - Visual Studio 2022, CMake 3.20+, CUDA Toolkit(optional, for GPU acceleration)   
 Linux - `make` (or `ninja`), `pkg-config`, `libcurl` (for web tools)    
 
