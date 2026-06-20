@@ -7,12 +7,12 @@ A minimal, embeddable C++ local LLM agent built on llama.cpp
 - Tool/function calling – Built-in file I/O, web fetch/search, command execution, code search   
 - Multi-step planning – Autonomous plan creation, step tracking, and execution
 - CUDA GPU acceleration – Automatic detection and enablement
-- Interactive CLI – REPL with slash commands, parameter tuning, session management
+- Interactive CLI – slash commands, parameter tuning, session management
 
 ## Key Differentiators:
 - Embeddable C++ library - `libagent_core` can be linked into any C++ application via `#include <core/Agent.h>`    
 - Zero runtime dependencies - No Python, no Node, no Docker – just the binary + a `.gguf` file    
-- Portable single binary - The CLI is a thin consumer; the library is the product    
+- Portable single binary - The CLI is a thin client; the library is the product    
 - Fully offline - Runs entirely without internet access    
 - ~5 MB footprint - Minimal codebase, no bloat
 
@@ -27,7 +27,7 @@ A minimal, embeddable C++ local LLM agent built on llama.cpp
 - execute_command: Execute a shell command and return its output (e.g. execute command  "python3 helloworld.py" )    
 - update_plan: Create or update a multi-step plan    
 
-## Quick Start (library consumer)
+## Quick Start (for library user)
 ```cpp
 #include <core/Agent.h>
 
