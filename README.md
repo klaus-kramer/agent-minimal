@@ -33,7 +33,7 @@ A minimal, embeddable C++ local LLM agent built on llama.cpp
 
 Agent::init();
 Agent agent;
-agent.loadModel("models/qwen2.5.gguf");
+agent.loadModel("models/gemma4.xyz.gguf");
 std::string reply = agent.chat("Hello!");
 Agent::shutdown();
 ```
