@@ -4,7 +4,7 @@ A minimal, embeddable C++ local LLM agent built on llama.cpp
 
 ## Features v0.1.0
 - Local LLM chat – Load GGUF model and chat interactively (atm recommended gemma4)    
-- Tool/function calling – Built-in file I/O, web fetch/search, command execution, code search   
+- Tool/function calling – Built-in file I/O, web fetch/search,  pattern search, command execution   
 - Multi-step planning – Autonomous plan creation, step tracking, and execution
 - CUDA GPU acceleration – Automatic detection and enablement
 - Interactive CLI – slash commands, parameter tuning, session management
