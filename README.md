@@ -14,7 +14,6 @@ A minimal, embeddable C++ local LLM agent built on llama.cpp
 - Zero runtime dependencies - No Python, no Node, no Docker – just the binary + a `.gguf` file    
 - Portable single binary - The CLI is a thin consumer; the library is the product    
 - Fully offline - Runs entirely without internet access    
-- Thread-safe API - Synchronous `chat()` and streaming `chatStreaming()` with proper lifecycle management    
 - ~5 MB footprint - Minimal codebase, no bloat   
 
 ## Quick Start (library consumer)
