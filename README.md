@@ -20,7 +20,7 @@ A minimal, embeddable C++ local LLM agent built on llama.cpp
 - read_file: Read the content of a file (e.g. read file LICENSE.txt)    
 - list_directory: List files and subdirectories of a path    
 - write_file: Write content to a file    
-- web_fetch: Fetch content from a URL (e.g. show the output of webside https://example.com )
+- web_fetch: Fetch content from a URL (e.g. show the output of URL https://example.com )
 - web_search: Search the web using DuckDuckGo    
 - search_pattern: Search file contents using a regex pattern    
 - search_files: Find files by glob pattern (e.g. show all files ending "*.h")
