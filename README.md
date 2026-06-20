@@ -9,7 +9,7 @@ A minimal, embeddable C++ local LLM agent built on llama.cpp
 - CUDA GPU acceleration – Automatic detection and enablement
 - Interactive CLI – REPL with slash commands, parameter tuning, session management
 
-## Unique Selling Points
+## Key Differentiators:
 - Embeddable C++ library - `libagent_core` can be linked into any C++ application via `#include <core/Agent.h>`    
 - Zero runtime dependencies - No Python, no Node, no Docker – just the binary + a `.gguf` file    
 - Portable single binary - The CLI is a thin consumer; the library is the product    
