@@ -28,11 +28,21 @@ Agent::shutdown();
 ```
 
 ## Build
+**Windows:**
 ```
 cmake -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 ```
-Requirements: Visual Studio 2022, CMake 3.20+, CUDA Toolkit(optional, for GPU acceleration)    
+**Linux:**
+```
+cmake -B build
+cmake --build build -j$(nproc)
+```
+Or with Ninja: `cmake -B build -G Ninja && cmake --build build`
+```
+Requirements:
+Windows - Visual Studio 2022, CMake 3.20+, CUDA Toolkit(optional, for GPU acceleration)   
+Linux - `make` (or `ninja`), `pkg-config`, `libcurl` (for web tools)    
 
 ## Tested With
 Developed and tested against gemma4-12B and Qwen2.5-7B. Other models may work but are used without guarantees – template detection heuristics may not cover all formats.    
