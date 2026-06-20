@@ -14,7 +14,17 @@ A minimal, embeddable C++ local LLM agent built on llama.cpp
 - Zero runtime dependencies - No Python, no Node, no Docker – just the binary + a `.gguf` file    
 - Portable single binary - The CLI is a thin consumer; the library is the product    
 - Fully offline - Runs entirely without internet access    
-- ~5 MB footprint - Minimal codebase, no bloat   
+- ~5 MB footprint - Minimal codebase, no bloat
+
+## ai-assistan-tools inside (in agent-minimal type /tools):
+- read_file: Read the content of a file (e.g. read file LICENSE.txt)    
+- list_directory: List files and subdirectories of a path    
+- write_file: Write content to a file    
+- web_fetch: Fetch content from a URL (e.g. show the output of webside https://example.com
+- search_pattern: Search file contents using a regex pattern    
+- search_files: Find files by glob pattern (e.g. show all files ending "*.h")
+- execute_command: Execute a shell command and return its output (e.g. start a pythonprogram)    
+- update_plan: Create or update a multi-step plan    
 
 ## Quick Start (library consumer)
 ```cpp
