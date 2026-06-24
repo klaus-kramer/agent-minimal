@@ -273,14 +273,17 @@ int main(int argc, char **argv)
                     std::cout << outputBuffer << std::flush;
                     outputBuffer.clear();
                 }
-                std::cout << "\n\n[Tool request] " << call.name
-                          << " with args: " << call.rawArguments << "\n"
-                          << "Allow? (y/N): " << std::flush;
-                std::string input;
-                std::getline(std::cin, input);
-                if (input != "y" && input != "Y") {
-                    std::cout << "[Denied]\n";
-                    return ToolResult{false, "Execution denied by user."};
+                bool needsConfirm = (def != nullptr && def->requiresConfirmation);
+                if (needsConfirm) {
+                    std::cout << "\n\n[Tool request] " << call.name
+                              << " with args: " << call.rawArguments << "\n"
+                              << "Allow? (y/N): " << std::flush;
+                    std::string input;
+                    std::getline(std::cin, input);
+                    if (input != "y" && input != "Y") {
+                        std::cout << "[Denied]\n";
+                        return ToolResult{false, "Execution denied by user."};
+                    }
                 }
                 std::cout << "[Executing " << call.name << " ...]\n";
                 return toolRegistry.executeTool(call);
