@@ -14,24 +14,48 @@ std::string ToolRegistry::generateToolPrompt() const
     if (m_tools.empty()) return {};
 
     std::ostringstream os;
-    os << "\nYou have access to tools. "
-          "To use a tool, respond with JSON: {\"function\": \"tool_name\", \"arguments\": {params}}.\n"
-          "For normal conversation, just reply naturally.\n\n"
-          "Available tools:\n";
+    os << "\nYou have access to the following functions. "
+          "Call a function when you need to perform an action instead of just replying.\n\n"
+
+          "Supported calling formats (use any):\n"
+          "1. JSON: {\"function\": \"name\", \"arguments\": {params}}\n"
+          "2. Gemma: call:name{param: \"value\"}\n"
+          "3. Simple: name(param: \"value\")\n\n"
+
+          "For normal conversation, reply naturally without any function call.\n\n"
+
+          "### Available functions\n\n";
 
     for (const auto& rt : m_tools) {
-        os << "- " << rt.def.name << "(";
+        os << "**" << rt.def.name << "**\n";
+        os << rt.def.description << "\n\n";
+        os << "JSON Schema:\n"
+           << "{\n"
+           << "  \"name\": \"" << rt.def.name << "\",\n"
+           << "  \"parameters\": {\n"
+           << "    \"type\": \"object\",\n"
+           << "    \"properties\": {\n";
+
         bool first = true;
         for (const auto& p : rt.def.parameters) {
-            if (!first) os << ", ";
-            os << p.name << ": " << p.type;
-            if (!p.required) os << "?";
+            if (!first) os << ",\n";
             first = false;
+            os << "      \"" << p.name << "\": {\n"
+               << "        \"type\": \"" << p.type << "\",\n"
+               << "        \"description\": \"" << p.description << "\"\n"
+               << "      }";
         }
-        os << ")";
-        if (!rt.def.description.empty())
-            os << ": " << rt.def.description;
-        os << "\n";
+
+        os << "\n    },\n    \"required\": [";
+        bool reqFirst = true;
+        for (const auto& p : rt.def.parameters) {
+            if (p.required) {
+                if (!reqFirst) os << ", ";
+                reqFirst = false;
+                os << "\"" << p.name << "\"";
+            }
+        }
+        os << "]\n  }\n}\n\n";
     }
 
     return os.str();
