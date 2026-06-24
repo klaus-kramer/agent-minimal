@@ -259,6 +259,6 @@ void registerWebSearchTool(ToolRegistry &registry)
         {"query", "The search query", "string", true},
         {"max_results", "Maximum number of results (1-20, default: 5)", "integer", false}
     };
-    def.requiresConfirmation = true;
+    def.requiresConfirmation = false;
     registry.registerTool(def, webSearchTool);
 }

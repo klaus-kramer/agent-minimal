@@ -6,6 +6,7 @@
 #include <sstream>
 #include <filesystem>
 #include <cctype>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 
@@ -173,6 +174,71 @@ static ToolResult writeFileTool(const ToolCall& call)
     return {true, os.str()};
 }
 
+static ToolResult editFileTool(const ToolCall& call)
+{
+    std::string path      = json_helper::extractToolArg(call.rawArguments, "path");
+    std::string oldString = json_helper::extractToolArg(call.rawArguments, "old_string");
+    std::string newString = json_helper::extractToolArg(call.rawArguments, "new_string");
+    std::string allStr    = json_helper::extractToolArg(call.rawArguments, "replace_all");
+    bool replaceAll = (allStr == "true" || allStr == "1");
+
+    if (path.empty())      return {false, "Missing parameter: path"};
+    if (oldString.empty()) return {false, "Missing parameter: old_string"};
+
+    fs::path fp;
+    try {
+        fp = resolveAndCheck(path);
+    } catch (const std::exception& e) {
+        return {false, e.what()};
+    }
+
+    if (!fs::exists(fp))        return {false, "File not found: " + path};
+    if (!fs::is_regular_file(fp)) return {false, "Not a regular file: " + path};
+
+    auto size = fs::file_size(fp);
+    if (size > MAX_FILE_TOOL_BYTES)
+        return {false, "File too large (" + std::to_string(size) + " bytes). Max " + std::to_string(MAX_FILE_TOOL_BYTES) + " bytes."};
+
+    std::ifstream f(fp, std::ios::binary);
+    if (!f) return {false, "Could not open file: " + path};
+
+    std::string content(static_cast<size_t>(size), '\0');
+    f.read(content.data(), static_cast<std::streamsize>(size));
+    f.close();
+
+    size_t pos = content.find(oldString);
+    if (pos == std::string::npos)
+        return {false, "old_string not found in file: " + path};
+
+    int lineNum = 1;
+    for (size_t i = 0; i < pos; ++i) {
+        if (content[i] == '\n') ++lineNum;
+    }
+
+    int count = 0;
+    if (replaceAll) {
+        size_t start = 0;
+        while ((start = content.find(oldString, start)) != std::string::npos) {
+            content.replace(start, oldString.size(), newString);
+            start += newString.size();
+            ++count;
+        }
+    } else {
+        content.replace(pos, oldString.size(), newString);
+        count = 1;
+    }
+
+    std::ofstream of(fp, std::ios::binary);
+    if (!of) return {false, "Could not open file for writing: " + path};
+    of.write(content.data(), static_cast<std::streamsize>(content.size()));
+    if (!of) return {false, "Failed to write to file: " + path};
+
+    std::ostringstream os;
+    os << "File edited: " << fp.string() << "\n";
+    os << "Line: " << lineNum << " | " << count << " replacement(s) made\n";
+    return {true, os.str()};
+}
+
 void registerFileTools(ToolRegistry& registry)
 {
     ToolDefinition readDef;
@@ -181,7 +247,7 @@ void registerFileTools(ToolRegistry& registry)
     readDef.parameters = {
         {"path", "The path to the file (relative or absolute, within project)", "string", true}
     };
-    readDef.requiresConfirmation = true;
+    readDef.requiresConfirmation = false;
     registry.registerTool(readDef, readFileTool);
 
     ToolDefinition listDef;
@@ -190,7 +256,7 @@ void registerFileTools(ToolRegistry& registry)
     listDef.parameters = {
         {"path", "The path to the directory (default: current directory)", "string", false}
     };
-    listDef.requiresConfirmation = true;
+    listDef.requiresConfirmation = false;
     registry.registerTool(listDef, listDirTool);
 
     ToolDefinition writeDef;
@@ -202,4 +268,16 @@ void registerFileTools(ToolRegistry& registry)
     };
     writeDef.requiresConfirmation = true;
     registry.registerTool(writeDef, writeFileTool);
+
+    ToolDefinition editDef;
+    editDef.name = "edit_file";
+    editDef.description = "Replace text in an existing file. Specify the exact old_string to find and the new_string to replace it with. Use replace_all to replace every occurrence. Maximum 100 KB. Restricted to the project directory.";
+    editDef.parameters = {
+        {"path", "The path to the file (relative or absolute, within project)", "string", true},
+        {"old_string", "The exact text to search for", "string", true},
+        {"new_string", "The replacement text", "string", true},
+        {"replace_all", "If true, replace all occurrences instead of just the first (default: false)", "string", false}
+    };
+    editDef.requiresConfirmation = true;
+    registry.registerTool(editDef, editFileTool);
 }

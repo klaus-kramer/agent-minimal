@@ -191,6 +191,6 @@ void registerWebFetchTool(ToolRegistry &registry)
         {"url", "The URL to fetch", "string", true},
         {"timeout", "Timeout in seconds (default: 30)", "integer", false}
     };
-    def.requiresConfirmation = true;
+    def.requiresConfirmation = false;
     registry.registerTool(def, webFetchTool);
 }
