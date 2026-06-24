@@ -19,7 +19,8 @@ A minimal, embeddable C++ local LLM agent built on llama.cpp
 ## ai-assistant-tools inside (in agent-minimal type /tools):
 - read_file: Read the content of a file (e.g. read file LICENSE.txt)    
 - list_directory: List files and subdirectories of a path    
-- write_file: Write content to a file    
+- write_file: Write content to a file
+- edit_file: Replace text in an existing file    
 - web_fetch: Fetch content from a URL (e.g. show the output of URL https://example.com )
 - web_search: Search the web using DuckDuckGo    
 - search_pattern: Search file contents using a regex pattern    
