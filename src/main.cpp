@@ -233,6 +233,8 @@ int main(int argc, char **argv)
     std::cout << "Context size: " << agent.model().contextSize() << " tokens"
               << std::endl;
 
+    std::cout << "agent minimal ready" << std::endl;
+
     std::cout << "Type /help for commands.\n" << std::endl;
 
     std::string line;
