@@ -1,0 +1,31 @@
+{
+  "model": {
+    "path": "models/qwen2.5-7b-instruct-q4_k_m.gguf",
+    "contextSize": 8192,
+    "batchSize": 512,
+    "threads": 0,
+    "gpuLayers": 99
+  },
+  "sampler": {
+    "temperature": 0.7,
+    "topP": 0.9,
+    "topK": 40,
+    "minP": 0.05,
+    "repeatPenalty": 1.1,
+    "freqPenalty": 0.0,
+    "presencePenalty": 0.0,
+    "penaltyLastN": 64,
+    "maxTokens": 4096,
+    "seed": 0
+  },
+  "tools": {
+    "enableFileTools": true,
+    "enableWebFetch": true,
+    "enableWebSearch": true,
+    "enableExecuteCommand": true,
+    "enableSearchPattern": true,
+    "enableSearchFiles": true,
+    "allowedRoot": ""
+  },
+  "systemPrompt": "You are a helpful AI assistant."
+}
