@@ -57,4 +57,4 @@ Windows - Visual Studio 2022, CMake 3.20+, CUDA Toolkit(optional, for GPU accele
 Linux - `make` (or `ninja`), `pkg-config`, `libcurl` (for web tools)    
 
 ## Tested With
-create models directory and download model. Developed and tested against gemma4-12B and Qwen2.5-7B. Other models may work but are used without guarantees – template detection heuristics may not cover all formats.    
+create models directory and download model. Developed and tested against gemma4-12B. Other models may work but are used without guarantees – template detection heuristics may not cover all formats.    
