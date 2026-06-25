@@ -17,6 +17,7 @@
 
 #include "core/Agent.h"
 #include "core/ToolRegistry.h"
+#include "core/Config.h"
 #include "tools/FileTool.h"
 #include "tools/WebFetchTool.h"
 #include "tools/WebSearchTool.h"
@@ -31,25 +32,27 @@ static void printHelp(const char *argv0)
         << "\n"
         << "Usage:\n"
         << "  " << argv0 << " -m MODEL [options]\n"
+        << "  " << argv0 << " --config CONFIG_FILE [options]\n"
         << "\n"
         << "Options:\n"
-        << "  -m, --model PATH     Path to .gguf file (or filename in models/)\n"
-        << "  -t, --temp VALUE     Temperature (default: 0.7)\n"
-        << "  -c, --ctx-size N     Context size (default: 8192)\n"
-        << "  -n, --max-tokens N   Max tokens to generate (default: 4096)\n"
-        << "  -s, --system TEXT    System prompt\n"
-        << "  -ngl, --gpu-layers N GPU layers (default: 99)\n"
+        << "  --config PATH          Path to JSON config file\n"
+        << "  -m, --model PATH       Path to .gguf file (or filename in models/)\n"
+        << "  -t, --temp VALUE       Temperature (default: 0.7)\n"
+        << "  -c, --ctx-size N       Context size (default: 8192)\n"
+        << "  -n, --max-tokens N     Max tokens to generate (default: 4096)\n"
+        << "  -s, --system TEXT      System prompt\n"
+        << "  -ngl, --gpu-layers N   GPU layers (default: 99)\n"
 
-        << "  -l, --list           List models in models/\n"
-        << "  -h, --help           Show this help\n"
+        << "  -l, --list             List models in models/\n"
+        << "  -h, --help             Show this help\n"
         << "\n"
         << "Interactive commands:\n"
-        << "  /exit, /quit         Exit the program\n"
-        << "  /reset, /clear       Clear conversation history\n"
-        << "  /system <text>       Set system prompt\n"
-        << "  /params              Show current parameters\n"
-        << "  /temp <value>        Change temperature\n"
-        << "  /help                Show command help\n"
+        << "  /exit, /quit           Exit the program\n"
+        << "  /reset, /clear         Clear conversation history\n"
+        << "  /system <text>         Set system prompt\n"
+        << "  /params                Show current parameters\n"
+        << "  /temp <value>          Change temperature\n"
+        << "  /help                  Show command help\n"
         << std::endl;
 }
 
@@ -89,9 +92,49 @@ int main(int argc, char **argv)
     Model::Params   mparams;
     std::string systemPrompt;
     bool listOnly = false;
+    std::string configPath;
 
     auto usage = [&]() { printHelp(argv[0]); };
 
+    // First pass: check for --config
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--config") {
+            if (++i >= argc) { std::cerr << "Error: --config expects a value\n"; exit(1); }
+            configPath = argv[i];
+        }
+    }
+
+    // Load config file if provided
+    agent::AgentConfig config;
+    if (!configPath.empty()) {
+        auto optConfig = agent::loadConfig(configPath);
+        if (!optConfig) {
+            std::cerr << "Failed to load config: " << configPath << "\n";
+            Agent::shutdown();
+            return 1;
+        }
+        config = *optConfig;
+        // Apply config as defaults
+        modelPath = config.model.path;
+        mparams.contextSize = config.model.contextSize;
+        mparams.batchSize = config.model.batchSize;
+        mparams.threads = config.model.threads;
+        mparams.gpuLayers = config.model.gpuLayers;
+        sparams.temperature = config.sampler.temperature;
+        sparams.topP = config.sampler.topP;
+        sparams.topK = config.sampler.topK;
+        sparams.minP = config.sampler.minP;
+        sparams.repeatPenalty = config.sampler.repeatPenalty;
+        sparams.freqPenalty = config.sampler.freqPenalty;
+        sparams.presencePenalty = config.sampler.presencePenalty;
+        sparams.penaltyLastN = config.sampler.penaltyLastN;
+        sparams.maxTokens = config.sampler.maxTokens;
+        sparams.seed = config.sampler.seed;
+        systemPrompt = config.systemPrompt;
+    }
+
+    // Second pass: CLI args override config
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         auto next = [&]() -> std::string {
@@ -99,7 +142,9 @@ int main(int argc, char **argv)
             return argv[i];
         };
 
-        if (arg == "-m" || arg == "--model")        modelPath = next();
+        if (arg == "--config") {
+            next(); // skip value, already processed
+        } else if (arg == "-m" || arg == "--model")        modelPath = next();
         else if (arg == "-t" || arg == "--temp")    sparams.temperature = std::stof(next());
         else if (arg == "-c" || arg == "--ctx-size") mparams.contextSize = std::stoi(next());
         else if (arg == "-n" || arg == "--max-tokens") sparams.maxTokens = std::stoi(next());
@@ -123,7 +168,7 @@ int main(int argc, char **argv)
     if (modelPath.empty()) {
         std::cerr << "No model specified. Available models:\n";
         listModels();
-        std::cerr << "\nUsage: " << argv[0] << " -m MODEL [-t 0.7]\n";
+        std::cerr << "\nUsage: " << argv[0] << " -m MODEL [-t 0.7] [--config CONFIG]\n";
         Agent::shutdown();
         return 1;
     }
@@ -135,12 +180,23 @@ int main(int argc, char **argv)
     }
 
     ToolRegistry toolRegistry;
-    registerFileTools(toolRegistry);
-    registerWebFetchTool(toolRegistry);
-    registerWebSearchTool(toolRegistry);
-    registerExecuteCommandTool(toolRegistry);
-    registerSearchPatternTool(toolRegistry);
-    registerSearchFilesTool(toolRegistry);
+    if (!configPath.empty()) {
+        if (config.tools.enableFileTools) registerFileTools(toolRegistry);
+        if (config.tools.enableWebFetch) registerWebFetchTool(toolRegistry);
+        if (config.tools.enableWebSearch) registerWebSearchTool(toolRegistry);
+        if (config.tools.enableExecuteCommand) registerExecuteCommandTool(toolRegistry);
+        if (config.tools.enableSearchPattern) registerSearchPatternTool(toolRegistry);
+        if (config.tools.enableSearchFiles) registerSearchFilesTool(toolRegistry);
+        if (!config.tools.allowedRoot.empty())
+            setAllowedRoot(config.tools.allowedRoot);
+    } else {
+        registerFileTools(toolRegistry);
+        registerWebFetchTool(toolRegistry);
+        registerWebSearchTool(toolRegistry);
+        registerExecuteCommandTool(toolRegistry);
+        registerSearchPatternTool(toolRegistry);
+        registerSearchFilesTool(toolRegistry);
+    }
 
     ToolDefinition planDef;
     planDef.name = "update_plan";
