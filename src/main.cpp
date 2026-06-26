@@ -198,21 +198,6 @@ int main(int argc, char **argv)
         registerSearchFilesTool(toolRegistry);
     }
 
-    ToolDefinition planDef;
-    planDef.name = "update_plan";
-    planDef.description = "Create or update a multi-step plan. Break complex tasks into steps and track progress."
-        " Actions: create (with steps array), advance (with optional result), append (with step), complete.";
-    planDef.parameters = {
-        {"action", "Action: create, advance, append, or complete", "string", true},
-        {"steps", "Array of step strings (required for create)", "array", false},
-        {"result", "Result of the completed step (optional for advance)", "string", false},
-        {"step", "Single step text (required for append)", "string", false}
-    };
-    planDef.requiresConfirmation = false;
-    toolRegistry.registerTool(planDef, [](const ToolCall &) -> ToolResult {
-        return {false, "Internal error: update_plan should be handled by Agent"};
-    });
-
     Agent agent;
     agent.setSamplerParams(sparams);
     agent.setToolRegistry(&toolRegistry);
