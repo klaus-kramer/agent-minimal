@@ -15,16 +15,6 @@
 
 class ToolRegistry;
 
-struct Plan {
-    std::vector<std::string> steps;
-    int currentStep = 0;
-    std::string lastResult;
-    bool active = false;
-    bool done = false;
-
-    bool isFinished() const { return done || (!steps.empty() && currentStep >= static_cast<int>(steps.size())); }
-};
-
 class Agent
 {
 public:
@@ -57,8 +47,6 @@ public:
 
     void setToolRegistry(ToolRegistry *registry);
 
-    Plan &plan() { return m_plan; }
-
     std::string chat(const std::string &userMessage,
                      ToolResolveCallback onToolResolve = defaultRejectTool);
 
@@ -89,13 +77,9 @@ private:
     ToolRegistry *m_toolRegistry = nullptr;
     std::atomic<bool> m_cancelled{false};
     std::atomic<int>  m_lastTokenCount{0};
-    Plan              m_plan;
     std::thread       m_worker;
 
     std::string  m_firstPassPrompt;
     std::string  m_toolContextSuffix;
     bool         m_bypassTemplate = false;
-
-    ToolResult handlePlanUpdate(const std::string &rawArgs);
-    std::string buildPlanContext() const;
 };

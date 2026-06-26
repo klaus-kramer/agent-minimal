@@ -64,7 +64,7 @@ static std::string buildGemma4Prompt(
     }
 
     if (addAssistant) {
-        append("<|turn>model\n<|channel>thought\n<channel|>");
+        append("<|turn>model\n");
     }
 
     return result;

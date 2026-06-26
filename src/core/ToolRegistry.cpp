@@ -61,10 +61,26 @@ std::string ToolRegistry::generateToolPrompt() const
     return os.str();
 }
 
-ToolCall ToolRegistry::parseToolCall(const std::string& response)
+ToolCall ToolRegistry::parseToolCall(const std::string& raw)
 {
+    std::string response = raw;
+    {
+        size_t s = response.find("```");
+        if (s != std::string::npos) {
+            size_t e = response.find("```", s + 3);
+            if (e != std::string::npos) {
+                std::string inner = response.substr(s + 3, e - s - 3);
+                size_t nl = inner.find('\n');
+                if (nl != std::string::npos)
+                    inner = inner.substr(nl + 1);
+                response = inner;
+            }
+        }
+    }
 
     std::string name = json_helper::extractStringValue(response, "function");
+    if (name.empty())
+        name = json_helper::extractStringValue(response, "name");
     if (!name.empty()) {
         std::string args = json_helper::extractObjectValue(response, "arguments");
         if (args.empty()) return {name, "{}"};

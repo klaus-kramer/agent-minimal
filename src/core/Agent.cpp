@@ -177,9 +177,6 @@ void Agent::runChat(const std::string &userMessage,
                     if (!fullSystem.empty() && fullSystem.back() != '\n')
                         fullSystem += '\n';
                     fullSystem += toolPrompt;
-                    if (m_plan.active && !m_plan.isFinished()) {
-                        fullSystem += "\n" + buildPlanContext();
-                    }
                     m_history.setSystemPrompt(fullSystem);
                 }
             }
@@ -446,21 +443,17 @@ void Agent::runChat(const std::string &userMessage,
                     }
 
                     const ToolDefinition *def = m_toolRegistry->findTool(call.name);
-                    bool isInternal = (call.name == "update_plan");
-                    if (!def && !isInternal) break;
+                    if (!def) break;
 
-                    ToolResult result;
-                    if (isInternal) {
-                        result = handlePlanUpdate(call.rawArguments);
-                    } else {
-                        result = onToolResolve(call, def);
-                    }
+                    ToolResult result = onToolResolve(call, def);
 
                     std::string toolResultStr
                         = rawResponse
-                        + "<|tool_response>response:" + call.name + "{<|\"|>"
+                        + "<turn|>\n"
+                        + "<|turn>tool\n"
                         + result.output
-                        + "<|\"|>}<tool_response|>";
+                        + "<turn|>\n"
+                        + "<|turn>model\n";
                     m_toolContextSuffix += toolResultStr;
                     m_bypassTemplate = true;
                     m_sampler.reset(vocab);
@@ -527,82 +520,6 @@ void Agent::runChat(const std::string &userMessage,
     }
 
     m_running = false;
-}
-
-ToolResult Agent::handlePlanUpdate(const std::string &rawArgs)
-{
-    std::string action = json_helper::extractToolArg(rawArgs, "action");
-
-    if (action == "create") {
-        if (m_plan.active && !m_plan.isFinished())
-            return {false, "Plan already active. Focus on the current step instead of creating a new plan."};
-
-        auto steps = json_helper::extractStringArray(rawArgs, "steps");
-        if (steps.empty())
-            return {false, "update_plan: 'steps' array is empty or missing. Provide at least one step."};
-
-        m_plan.steps = std::move(steps);
-        m_plan.currentStep = 0;
-        m_plan.lastResult.clear();
-        m_plan.active = true;
-        m_plan.done = false;
-
-        std::string output = "Plan created with " + std::to_string(m_plan.steps.size()) + " steps.";
-        for (size_t i = 0; i < m_plan.steps.size(); ++i)
-            output += "\n  " + std::to_string(i + 1) + ". " + m_plan.steps[i];
-        return {true, output};
-
-    } else if (action == "advance") {
-        if (!m_plan.active)
-            return {false, "No active plan. Call update_plan with action='create' first."};
-
-        std::string result = json_helper::extractToolArg(rawArgs, "result");
-        if (!result.empty())
-            m_plan.lastResult = result;
-
-        m_plan.currentStep++;
-
-        if (m_plan.isFinished()) {
-            m_plan.done = true;
-            return {true, "All plan steps completed!"};
-        }
-
-        return {true, "Advanced to step " + std::to_string(m_plan.currentStep + 1)
-                + "/" + std::to_string(m_plan.steps.size())
-                + ": " + m_plan.steps[m_plan.currentStep]};
-
-    } else if (action == "append") {
-        std::string step = json_helper::extractToolArg(rawArgs, "step");
-        if (step.empty())
-            return {false, "update_plan: 'step' is required for action='append'."};
-        m_plan.steps.push_back(step);
-        return {true, "Appended step " + std::to_string(m_plan.steps.size()) + ": " + step};
-
-    } else if (action == "complete") {
-        if (!m_plan.active)
-            return {false, "No active plan to complete."};
-        m_plan.done = true;
-        return {true, "Plan marked as complete."};
-
-    } else {
-        return {false, "Unknown action '" + action + "'. Use: create, advance, append, complete."};
-    }
-}
-
-std::string Agent::buildPlanContext() const
-{
-    if (!m_plan.active || m_plan.isFinished())
-        return {};
-
-    std::string ctx;
-    ctx += "## Active Plan (Step " + std::to_string(m_plan.currentStep + 1)
-        + "/" + std::to_string(m_plan.steps.size()) + ")\n";
-    ctx += m_plan.steps[m_plan.currentStep] + "\n";
-
-    if (!m_plan.lastResult.empty())
-        ctx += "Previous: " + m_plan.lastResult + "\n";
-
-    return ctx;
 }
 
 void Agent::cancel()
