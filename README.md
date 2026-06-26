@@ -2,10 +2,9 @@
 A minimal, embeddable C++ local LLM agent built on llama.cpp
 
 
-## Features v0.1.2
+## Features v0.1.3
 - Local LLM chat – Load GGUF model and chat interactively (atm recommended gemma4)    
 - Tool/function calling – Built-in file I/O, web fetch/search,  pattern search, command execution   
-- Multi-step planning – plan creation, step tracking, and execution
 - CUDA GPU acceleration – Automatic detection and enablement
 - Interactive CLI – slash commands, parameter tuning, session management
 
@@ -25,8 +24,7 @@ A minimal, embeddable C++ local LLM agent built on llama.cpp
 - web_search: Search the web using DuckDuckGo    
 - search_pattern: Search file contents using a regex pattern    
 - search_files: Find files by glob pattern (e.g. show all files ending "*.h")
-- execute_command: Execute a shell command and return its output (e.g. execute command  "python3 helloworld.py" )    
-- update_plan: Create or update a multi-step plan    
+- execute_command: Execute a shell command and return its output (e.g. execute command  "python3 helloworld.py" )     
 
 ## Quick Start (for library user)
 ```cpp
