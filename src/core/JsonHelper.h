@@ -170,10 +170,18 @@ inline std::string extractGemmaStringValue(const std::string &obj, const std::st
         size_t valStart = skipWhitespace(obj, pos + search.size());
         if (valStart >= obj.size()) return {};
 
-        if (obj[valStart] == '"') {
-            size_t valEnd = findStringEnd(obj, valStart);
-            if (valEnd == std::string::npos) return {};
-            return obj.substr(valStart + 1, valEnd - valStart - 2);
+        if (obj[valStart] == '"' || obj[valStart] == '\'') {
+            if (obj[valStart] == '"') {
+                size_t valEnd = findStringEnd(obj, valStart);
+                if (valEnd == std::string::npos) return {};
+                return obj.substr(valStart + 1, valEnd - valStart - 2);
+            } else {
+                size_t valEnd = valStart + 1;
+                while (valEnd < obj.size() && obj[valEnd] != '\'')
+                    ++valEnd;
+                if (valEnd >= obj.size()) return {};
+                return obj.substr(valStart + 1, valEnd - valStart - 1);
+            }
         }
 
         size_t valEnd = valStart;
@@ -233,6 +241,8 @@ inline std::string extractToolArg(const std::string &rawArgs, const std::string 
     if (!val.empty()) return val;
 
     std::string args = extractObjectValue(rawArgs, "arguments");
+    if (args.empty())
+        args = extractObjectValue(rawArgs, "parameters");
     if (!args.empty()) {
         val = extractStringValue(args, key);
         if (!val.empty()) return val;

@@ -277,14 +277,33 @@ void Agent::runChat(const std::string &userMessage,
                     std::string piece(buf, static_cast<size_t>(n));
                     rawResponse += piece;
 
-                    if (pState == STREAMING) {
+                    bool isToolMarker = (piece == "<|tool_call>" || piece == "<tool_call|>" || piece == "<|tool_call|>");
+                    if (isToolMarker) {
+                        if (onToken) onToken("\n");
+                    }
+
+                    if (isToolMarker) {
+                        // marker already handled above, just fall through to decode
+                    } else if (pState == STREAMING) {
                         if (!suppressStream) {
                             std::string check = response + piece;
-                            if (check.size() < 200) {
+                            if (check.size() < 300) {
                                 auto fpos = check.find("\"function\":");
-                                if (fpos != std::string::npos && fpos < 200) {
+                                if (fpos != std::string::npos && fpos < 300) {
                                     auto bracePos = check.rfind('{', fpos);
-                                    if (bracePos != std::string::npos && check.size() - bracePos < 100) {
+                                    if (bracePos != std::string::npos && check.size() - bracePos < 150) {
+                                        suppressStream = true;
+                                        toolJsonDepth = 0;
+                                        for (size_t i = bracePos; i < response.size(); ++i)
+                                            if (response[i] == '{') ++toolJsonDepth;
+                                            else if (response[i] == '}') --toolJsonDepth;
+                                        if (onToken) onToken("\n[Calling tool...]\n");
+                                    }
+                                }
+                                auto gemmaPos = check.find("call:");
+                                if (!suppressStream && gemmaPos != std::string::npos && gemmaPos < 300) {
+                                    auto bracePos = check.find('{', gemmaPos);
+                                    if (bracePos != std::string::npos && bracePos - gemmaPos < 80) {
                                         suppressStream = true;
                                         toolJsonDepth = 0;
                                         for (size_t i = bracePos; i < response.size(); ++i)
@@ -305,10 +324,11 @@ void Agent::runChat(const std::string &userMessage,
                                 suppressStream = false;
                                 toolJsonDepth = 0;
                             }
-                            continue;
                         }
-                        response += piece;
-                        if (onToken) onToken(piece);
+                        if (!suppressStream) {
+                            response += piece;
+                            if (onToken) onToken(piece);
+                        }
                     } else if (pState == SCANNING) {
                         discardBuf += piece;
                         auto markerPos = discardBuf.find("<channel|");

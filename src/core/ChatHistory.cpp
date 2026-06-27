@@ -35,7 +35,8 @@ static bool isGemma4(const Model &model)
     std::string name = desc;
     for (auto &c : name)
         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return name.find("gemma-4") != std::string::npos ||
+    return name.find("gemma4")  != std::string::npos ||
+           name.find("gemma-4") != std::string::npos ||
            name.find("gemma 4") != std::string::npos;
 }
 
@@ -81,7 +82,8 @@ static std::string detectBuiltinTemplate(const Model &model)
     for (auto &c : name)
         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
-    if (name.find("gemma-4") != std::string::npos ||
+    if (name.find("gemma4")  != std::string::npos ||
+        name.find("gemma-4") != std::string::npos ||
         name.find("gemma 4") != std::string::npos) return "gemma4";
     if (name.find("gemma")   != std::string::npos) return "gemma";
     if (name.find("llama4")  != std::string::npos) return "llama4";

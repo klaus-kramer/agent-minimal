@@ -17,12 +17,10 @@ std::string ToolRegistry::generateToolPrompt() const
     os << "\nYou have access to the following functions. "
           "Call a function when you need to perform an action instead of just replying.\n\n"
 
-          "Supported calling formats (use any):\n"
-          "1. JSON: {\"function\": \"name\", \"arguments\": {params}}\n"
-          "2. Gemma: call:name{param: \"value\"}\n"
-          "3. Simple: name(param: \"value\")\n\n"
+          "Call format: {\"function\": \"name\", \"arguments\": {params}}\n"
+          "Example: {\"function\": \"read_file\", \"arguments\": {\"path\": \"foo.txt\"}}\n\n"
 
-          "For normal conversation, reply naturally without any function call.\n\n"
+          "Reply naturally for normal conversation, without any function call.\n\n"
 
           "### Available functions\n\n";
 
@@ -83,6 +81,8 @@ ToolCall ToolRegistry::parseToolCall(const std::string& raw)
         name = json_helper::extractStringValue(response, "name");
     if (!name.empty()) {
         std::string args = json_helper::extractObjectValue(response, "arguments");
+        if (args.empty())
+            args = json_helper::extractObjectValue(response, "parameters");
         if (args.empty()) return {name, "{}"};
 
         if (args[0] == '"') {
