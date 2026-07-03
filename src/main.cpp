@@ -53,6 +53,7 @@ static void printHelp(const char *argv0)
         << "  /params                Show current parameters\n"
         << "  /temp <value>          Change temperature\n"
         << "  /help                  Show command help\n"
+        << "  /safe                  Toggle read-only safe mode (blocks write/modify tools)\n"
         << std::endl;
 }
 
@@ -96,7 +97,6 @@ int main(int argc, char **argv)
 
     auto usage = [&]() { printHelp(argv[0]); };
 
-    // First pass: check for --config
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "--config") {
@@ -105,7 +105,6 @@ int main(int argc, char **argv)
         }
     }
 
-    // Load config file if provided
     agent::AgentConfig config;
     if (!configPath.empty()) {
         auto optConfig = agent::loadConfig(configPath);
@@ -115,7 +114,6 @@ int main(int argc, char **argv)
             return 1;
         }
         config = *optConfig;
-        // Apply config as defaults
         modelPath = config.model.path;
         mparams.contextSize = config.model.contextSize;
         mparams.batchSize = config.model.batchSize;
@@ -134,7 +132,6 @@ int main(int argc, char **argv)
         systemPrompt = config.systemPrompt;
     }
 
-    // Second pass: CLI args override config
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         auto next = [&]() -> std::string {
@@ -143,7 +140,7 @@ int main(int argc, char **argv)
         };
 
         if (arg == "--config") {
-            next(); // skip value, already processed
+            next();
         } else if (arg == "-m" || arg == "--model")        modelPath = next();
         else if (arg == "-t" || arg == "--temp")    sparams.temperature = std::stof(next());
         else if (arg == "-c" || arg == "--ctx-size") mparams.contextSize = std::stoi(next());
@@ -223,9 +220,17 @@ int main(int argc, char **argv)
     std::cout << "Type /help for commands.\n" << std::endl;
 
     std::string line;
+    bool noSecurity = false;
+    bool safeMode = false;
     while (true) {
         int rctx = agent.remainingContext();
-        std::cout << rctx << "> " << std::flush;
+
+        if (safeMode)
+            std::cout << "safe_" << rctx << "> " << std::flush;
+        else if (noSecurity)
+            std::cout << "nosecurity_" << rctx << "> " << std::flush;
+        else
+            std::cout << "normal_" << rctx << "> " << std::flush;
 
         if (!std::getline(std::cin, line))
             break;
@@ -283,7 +288,15 @@ int main(int argc, char **argv)
                     << "  /params            Show current parameters\n"
                     << "  /temp [value]      Show/change temperature\n"
                     << "  /tools             List available AI tools\n"
-                    << "  /help              Show this help\n";
+                    << "  /help              Show this help\n"
+                    << "  /nosecurity        Toggle security confirmations off/on\n"
+                    << "  /safe              Toggle read-only safe mode\n";
+            } else if (cmd == "nosecurity") {
+                noSecurity = !noSecurity;
+                std::cout << (noSecurity ? "Security confirmations disabled.\n" : "Security confirmations enabled.\n");
+            } else if (cmd == "safe") {
+                safeMode = !safeMode;
+                std::cout << (safeMode ? "Safe mode enabled: write/modify tools blocked.\n" : "Safe mode disabled: all tools available.\n");
             } else {
                 std::cerr << "Unknown command: " << cmd << "  (/help for help)\n";
             }
@@ -316,7 +329,18 @@ int main(int argc, char **argv)
                     std::cout << outputBuffer << std::flush;
                     outputBuffer.clear();
                 }
-                bool needsConfirm = (def != nullptr && def->requiresConfirmation);
+                if (safeMode) {
+                    static const char *restrictedTools[] = {"write_file", "edit_file", "execute_command"};
+                    bool restricted = false;
+                    for (auto *name : restrictedTools) {
+                        if (call.name == name) { restricted = true; break; }
+                    }
+                    if (restricted) {
+                        std::cout << "[Denied by safe mode: " << call.name << " not allowed]\n";
+                        return ToolResult{false, "Blocked by safe mode: write/modify operations not allowed."};
+                    }
+                }
+                bool needsConfirm = (def != nullptr && def->requiresConfirmation && !noSecurity);
                 if (needsConfirm) {
                     std::cout << "\n\n[Tool request] " << call.name
                               << " with args: " << call.rawArguments << "\n"
