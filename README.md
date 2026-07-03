@@ -2,7 +2,7 @@
 A minimal, embeddable C++ local LLM agent built on llama.cpp
 
 
-## Features v0.1.4
+## Features v0.1.5
 - Local LLM chat – Load GGUF model and chat interactively (atm recommended gemma4)    
 - Tool/function calling – Built-in file I/O, web fetch/search,  pattern search, command execution   
 - CUDA GPU acceleration – Automatic detection and enablement
@@ -14,6 +14,19 @@ A minimal, embeddable C++ local LLM agent built on llama.cpp
 - Portable single binary - The CLI is a thin client; the library is the product    
 - Fully offline - Runs entirely without internet access    
 - ~5 MB footprint - Minimal codebase
+
+
+## commands:
+  /exit              Exit the program    
+  /reset             Clear conversation history    
+  /system <text>     Set system prompt    
+  /params            Show current parameters    
+  /temp [value]      Show/change temperature    
+  /tools             List available AI tools    
+  /help              Show this help    
+  /nosecurity        Toggle security confirmations off/on    
+  /safe              Toggle read-only safe mode    
+
 
 ## ai-assistant-tools inside (in agent-minimal type /tools):
 - read_file: Read the content of a file (e.g. read file LICENSE.txt)    
