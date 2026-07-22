@@ -1,5 +1,5 @@
 # agent-minimal
-A minimal, embeddable C++ local AI agent built on llama.cpp
+A minimal, embeddable C++ local AI agent built on llama.cpp. It demonstrates tool callingand a clean architecture without heavy dependencies.
 
 
 ## Features v0.1.5
