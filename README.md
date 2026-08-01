@@ -40,10 +40,15 @@ A minimal, embeddable C++ local AI agent built on llama.cpp. It demonstrates too
 - execute_command: Execute a shell command and return its output (e.g. execute command  "python3 helloworld.py" )
 
 ## CLI startparameter    
+- path --config
+- model -m     
 - temperature -t
-- context -c
-- maxtokens -n
-- gpulayer -ngl
+- context -c (example -c 8192)    
+- maxtokens -n (example -n 4096)    
+- gpulayer -ngl (example -ngl 99)
+- systemtext -s
+- listmodels -l
+- help -h    
   
 
 ## Quick Start (for library user)
