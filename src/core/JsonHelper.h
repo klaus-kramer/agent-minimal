@@ -124,10 +124,11 @@ inline std::string extractObjectValue(const std::string &s, const std::string &k
     }
 }
 
-inline std::string extractGemmaCall(const std::string &s, std::string &rawObject)
+inline std::string extractGemmaCallAt(const std::string &s, size_t startPos, std::string &rawObject)
 {
+    rawObject.clear();
 
-    size_t pos = s.find("call:");
+    size_t pos = s.find("call:", startPos);
     if (pos == std::string::npos) return {};
 
     pos += 5;
@@ -151,6 +152,11 @@ inline std::string extractGemmaCall(const std::string &s, std::string &rawObject
     if (rawObject[0] == '(')
         rawObject = "{" + rawObject.substr(1, rawObject.size() - 2) + "}";
     return name;
+}
+
+inline std::string extractGemmaCall(const std::string &s, std::string &rawObject)
+{
+    return extractGemmaCallAt(s, 0, rawObject);
 }
 
 inline std::string extractGemmaStringValue(const std::string &obj, const std::string &key)

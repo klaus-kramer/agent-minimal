@@ -99,10 +99,14 @@ ToolCall ToolRegistry::parseToolCall(const std::string& raw)
     }
 
     std::string rawObj;
-    name = json_helper::extractGemmaCall(response, rawObj);
-    if (!name.empty()) {
-
-        return {name, rawObj};
+    size_t callPos = 0;
+    while (true) {
+        size_t cpos = response.find("call:", callPos);
+        if (cpos == std::string::npos) break;
+        name = json_helper::extractGemmaCallAt(response, cpos, rawObj);
+        if (!name.empty())
+            return {name, rawObj.empty() ? "{}" : rawObj};
+        callPos = cpos + 5;
     }
 
     for (const auto &rt : m_tools) {

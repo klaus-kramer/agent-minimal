@@ -15,8 +15,10 @@ bool Sampler::init(const llama_vocab *vocab, const Params &params)
     m_params = params;
 
     uint32_t seed = params.seed;
-    if (seed == 0)
+    if (seed == 0) {
         seed = static_cast<uint32_t>(std::random_device{}());
+        m_params.seed = seed;
+    }
 
     auto sparams = llama_sampler_chain_default_params();
     m_chain = llama_sampler_chain_init(sparams);

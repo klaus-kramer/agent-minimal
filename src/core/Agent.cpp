@@ -11,16 +11,28 @@
 #include <stdexcept>
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
+#include <iostream>
 #include <unordered_set>
 
 static std::mutex s_llamaMutex;
 static int s_llamaRefCount = 0;
 
+static constexpr size_t MAX_TOOL_RESULT_CHARS = 16384;
+
+static void agentLogCallback(ggml_log_level level, const char * text, void * /*user_data*/)
+{
+    if (text && level >= GGML_LOG_LEVEL_INFO)
+        std::fputs(text, stderr);
+}
+
 void Agent::init()
 {
     std::lock_guard<std::mutex> lock(s_llamaMutex);
-    if (s_llamaRefCount++ == 0)
+    if (s_llamaRefCount++ == 0) {
+        llama_log_set(agentLogCallback, nullptr);
         llama_backend_init();
+    }
 }
 
 void Agent::shutdown()
@@ -187,7 +199,10 @@ void Agent::runChat(const std::string &userMessage,
 
             int ctxSize   = llama_n_ctx(ctx);
             int maxTokens = m_samplerParams.maxTokens;
-            int maxPrompt  = ctxSize - maxTokens - 32;
+            // Reserve at most a quarter of the context for generation output so
+            // that tool results still have room in the prompt.
+            int genReserve = std::min(maxTokens, std::max(64, ctxSize / 4));
+            int maxPrompt  = ctxSize - genReserve - 32;
             if (maxPrompt < 32) maxPrompt = 32;
 
             std::string prompt;
@@ -208,15 +223,43 @@ void Agent::runChat(const std::string &userMessage,
 
             if (nTokens < 0) {
                 if (m_bypassTemplate && !m_firstPassPrompt.empty()) {
-                    m_history.trimToFit(m_model, maxPrompt);
-                    prompt = m_history.applyTemplate(m_model, true);
-                    m_firstPassPrompt = prompt;
-                    m_toolContextSuffix.clear();
-                    m_bypassTemplate = false;
-                    nTokens = llama_tokenize(vocab,
-                        prompt.c_str(), static_cast<int>(prompt.size()),
-                        tokens.data(), static_cast<int>(tokens.size()),
-                        true, true);
+                    // Shrink the tool context suffix (drop from the front) until
+                    // the prompt fits, instead of silently discarding the tool
+                    // result. The trailing model marker is preserved.
+                    const std::string modelOpen = "\n<|turn>model\n";
+                    while (nTokens < 0 && !m_toolContextSuffix.empty()) {
+                        size_t cut = std::max<size_t>(1, m_toolContextSuffix.size() / 4);
+                        m_toolContextSuffix.erase(0, cut);
+                        prompt = m_firstPassPrompt + m_toolContextSuffix;
+                        nTokens = llama_tokenize(vocab,
+                            prompt.c_str(), static_cast<int>(prompt.size()),
+                            tokens.data(), static_cast<int>(tokens.size()),
+                            true, true);
+                    }
+                    if (!m_toolContextSuffix.empty() &&
+                        (m_toolContextSuffix.size() < modelOpen.size() ||
+                         m_toolContextSuffix.compare(m_toolContextSuffix.size() - modelOpen.size(),
+                                                     modelOpen.size(), modelOpen) != 0)) {
+                        m_toolContextSuffix += modelOpen;
+                        prompt = m_firstPassPrompt + m_toolContextSuffix;
+                        nTokens = llama_tokenize(vocab,
+                            prompt.c_str(), static_cast<int>(prompt.size()),
+                            tokens.data(), static_cast<int>(tokens.size()),
+                            true, true);
+                    }
+                    if (nTokens < 0) {
+                        m_history.trimToFit(m_model, maxPrompt);
+                        prompt = m_history.applyTemplate(m_model, true);
+                        m_firstPassPrompt = prompt;
+                        m_toolContextSuffix.clear();
+                        m_bypassTemplate = false;
+                        nTokens = llama_tokenize(vocab,
+                            prompt.c_str(), static_cast<int>(prompt.size()),
+                            tokens.data(), static_cast<int>(tokens.size()),
+                            true, true);
+                    }
+                    if (nTokens > 0)
+                        std::cerr << "\n[Context near capacity - tool output was trimmed]\n";
                 } else {
                     m_history.trimToFit(m_model, maxPrompt);
                     prompt = m_history.applyTemplate(m_model, true);
@@ -262,6 +305,7 @@ void Agent::runChat(const std::string &userMessage,
             int generated = 0;
             bool suppressStream = false;
             int toolJsonDepth = 0;
+            size_t toolScanPos = 0;
 
             while (generated < maxTokens && !m_cancelled) {
                 llama_token token = m_sampler.sample(ctx, -1);
@@ -286,12 +330,20 @@ void Agent::runChat(const std::string &userMessage,
                         // marker already handled above, just fall through to decode
                     } else if (pState == STREAMING) {
                         if (!suppressStream) {
+                            size_t openPos = piece.find("<|channel>");
+                            if (openPos != std::string::npos) {
+                                pState = DISCARDING;
+                                discardBuf = piece.substr(openPos + 10);
+                                goto piece_handled;
+                            }
+                        }
+                        if (!suppressStream) {
                             std::string check = response + piece;
                             if (check.size() < 300) {
-                                auto fpos = check.find("\"function\":");
+                                auto fpos = check.find("\"function\":", toolScanPos);
                                 if (fpos != std::string::npos && fpos < 300) {
                                     auto bracePos = check.rfind('{', fpos);
-                                    if (bracePos != std::string::npos && check.size() - bracePos < 150) {
+                                    if (bracePos != std::string::npos && bracePos >= toolScanPos && check.size() - bracePos < 150) {
                                         suppressStream = true;
                                         toolJsonDepth = 0;
                                         for (size_t i = bracePos; i < response.size(); ++i)
@@ -300,10 +352,10 @@ void Agent::runChat(const std::string &userMessage,
                                         if (onToken) onToken("\n[Calling tool...]\n");
                                     }
                                 }
-                                auto gemmaPos = check.find("call:");
+                                auto gemmaPos = check.find("call:", toolScanPos);
                                 if (!suppressStream && gemmaPos != std::string::npos && gemmaPos < 300) {
                                     auto bracePos = check.find('{', gemmaPos);
-                                    if (bracePos != std::string::npos && bracePos - gemmaPos < 80) {
+                                    if (bracePos != std::string::npos && bracePos >= toolScanPos && bracePos - gemmaPos < 80) {
                                         suppressStream = true;
                                         toolJsonDepth = 0;
                                         for (size_t i = bracePos; i < response.size(); ++i)
@@ -323,6 +375,7 @@ void Agent::runChat(const std::string &userMessage,
                             if (toolJsonDepth <= 0) {
                                 suppressStream = false;
                                 toolJsonDepth = 0;
+                                toolScanPos = response.size();
                             }
                         }
                         if (!suppressStream) {
@@ -342,20 +395,30 @@ void Agent::runChat(const std::string &userMessage,
                             }
                             discardBuf.clear();
                             pState = STREAMING;
-                        } else if (discardBuf.size() > 128) {
-                            pState = STREAMING;
-                            response = discardBuf;
-                            if (onToken) onToken(discardBuf);
-                            discardBuf.clear();
+                        } else if (discardBuf.find("<|channel>") == std::string::npos) {
+                            if (discardBuf.size() > 128) {
+                                pState = STREAMING;
+                                response = discardBuf;
+                                if (onToken) onToken(discardBuf);
+                                discardBuf.clear();
+                            }
                         }
-                    } else {
+                    } else if (pState == DISCARDING) {
                         discardBuf += piece;
-                        auto endPos = discardBuf.find("|>");
+                        size_t endPos = discardBuf.find("<channel|");
                         if (endPos != std::string::npos) {
+                            std::string rest = discardBuf.substr(endPos + 9);
+                            if (!rest.empty() && rest[0] == '>')
+                                rest = rest.substr(1);
                             discardBuf.clear();
                             pState = STREAMING;
+                            if (!rest.empty()) {
+                                response += rest;
+                                if (onToken) onToken(rest);
+                            }
                         }
                     }
+                    piece_handled: ;
                 }
 
                 llama_batch batch = llama_batch_get_one(&token, 1);
@@ -366,10 +429,10 @@ void Agent::runChat(const std::string &userMessage,
                 ++generated;
             }
 
-            if (pState != STREAMING) {
+            if (pState == SCANNING && discardBuf.find("<|channel>") == std::string::npos) {
                 response += discardBuf;
-                discardBuf.clear();
             }
+            discardBuf.clear();
 
             m_lastTokenCount = nTokens + generated;
 
@@ -407,12 +470,7 @@ void Agent::runChat(const std::string &userMessage,
                     ToolCall call = m_toolRegistry->parseToolCall(remaining);
                     if (call.name.empty()) break;
 
-                    std::string callKey = call.name;
-                    if (call.name == "write_file") {
-                        callKey += "|" + json_helper::extractToolArg(call.rawArguments, "path");
-                    } else if (call.name == "read_file") {
-                        callKey += "|" + json_helper::extractToolArg(call.rawArguments, "path");
-                    }
+                    std::string callKey = call.name + "|" + call.rawArguments;
 
                     if (!seenCalls.insert(callKey).second) {
                         bool removed = false;
@@ -441,7 +499,7 @@ void Agent::runChat(const std::string &userMessage,
                                 }
                             }
                         }
-                        continue;
+                        if (!removed) break;
                     }
 
                     if (call.name == "thought") {
@@ -467,13 +525,35 @@ void Agent::runChat(const std::string &userMessage,
 
                     ToolResult result = onToolResolve(call, def);
 
+                    std::string toolOutput = result.output;
+                    if (toolOutput.size() > MAX_TOOL_RESULT_CHARS) {
+                        toolOutput.resize(MAX_TOOL_RESULT_CHARS);
+                        toolOutput += "\n...(tool output truncated for context at "
+                            + std::to_string(MAX_TOOL_RESULT_CHARS) + " chars)";
+                    }
+
+                    std::string asstText = rawResponse;
+                    {
+                        size_t p = 0;
+                        while ((p = asstText.find("<|channel>")) != std::string::npos) {
+                            size_t close = asstText.find("<channel|>", p);
+                            if (close == std::string::npos) {
+                                asstText.erase(p);
+                                break;
+                            }
+                            asstText.erase(p, close - p + 9);
+                        }
+                    }
+
                     std::string toolResultStr
-                        = rawResponse
+                        = asstText
                         + "<turn|>\n"
                         + "<|turn>tool\n"
-                        + result.output
+                        + toolOutput
                         + "<turn|>\n"
-                        + "<|turn>model\n";
+                        + "<|turn>model\n"
+                        + "Tool call executed. If you have enough information, provide your final answer now. "
+                          "Call more tools only if you still need additional information.\n";
                     m_toolContextSuffix += toolResultStr;
                     m_bypassTemplate = true;
                     m_sampler.reset(vocab);

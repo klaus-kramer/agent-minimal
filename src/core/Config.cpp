@@ -93,7 +93,7 @@ std::optional<AgentConfig> loadConfig(const std::string& configPath) {
 bool saveConfigExample(const std::string& configPath) {
     const char* example = R"({
   "model": {
-    "path": "models/qwen2.5-7b-instruct-q4_k_m.gguf",
+    "path": "models/gemma-4-12B-it-Q4_K_M.gguf",
     "contextSize": 8192,
     "batchSize": 512,
     "threads": 0,
