@@ -142,11 +142,23 @@ int main(int argc, char **argv)
         if (arg == "--config") {
             next();
         } else if (arg == "-m" || arg == "--model")        modelPath = next();
-        else if (arg == "-t" || arg == "--temp")    sparams.temperature = std::stof(next());
-        else if (arg == "-c" || arg == "--ctx-size") mparams.contextSize = std::stoi(next());
-        else if (arg == "-n" || arg == "--max-tokens") sparams.maxTokens = std::stoi(next());
+        else if (arg == "-t" || arg == "--temp") {
+            try { sparams.temperature = std::stof(next()); }
+            catch (...) { std::cerr << "Error: " << arg << " expects a number\n"; return 1; }
+        }
+        else if (arg == "-c" || arg == "--ctx-size") {
+            try { mparams.contextSize = std::stoi(next()); }
+            catch (...) { std::cerr << "Error: " << arg << " expects an integer\n"; return 1; }
+        }
+        else if (arg == "-n" || arg == "--max-tokens") {
+            try { sparams.maxTokens = std::stoi(next()); }
+            catch (...) { std::cerr << "Error: " << arg << " expects an integer\n"; return 1; }
+        }
         else if (arg == "-s" || arg == "--system")  systemPrompt = next();
-        else if (arg == "-ngl" || arg == "--gpu-layers") mparams.gpuLayers = std::stoi(next());
+        else if (arg == "-ngl" || arg == "--gpu-layers") {
+            try { mparams.gpuLayers = std::stoi(next()); }
+            catch (...) { std::cerr << "Error: " << arg << " expects an integer\n"; return 1; }
+        }
         else if (arg == "-l" || arg == "--list")    listOnly = true;
         else if (arg == "-h" || arg == "--help")    { usage(); Agent::shutdown(); return 0; }
         else {
