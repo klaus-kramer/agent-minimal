@@ -37,7 +37,14 @@ A minimal, embeddable C++ local AI agent built on llama.cpp. It demonstrates too
 - web_search: Search the web using DuckDuckGo    
 - search_pattern: Search file contents using a regex pattern    
 - search_files: Find files by glob pattern (e.g. show all files ending "*.h")
-- execute_command: Execute a shell command and return its output (e.g. execute command  "python3 helloworld.py" )     
+- execute_command: Execute a shell command and return its output (e.g. execute command  "python3 helloworld.py" )
+
+## CLI startparameter    
+- temperature -t
+- context -c
+- maxtokens -n
+- gpulayer -ngl
+  
 
 ## Quick Start (for library user)
 ```cpp
