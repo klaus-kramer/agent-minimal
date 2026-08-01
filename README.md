@@ -58,7 +58,7 @@ A minimal, embeddable C++ local AI agent built on llama.cpp. It demonstrates too
 Agent::init();
 Agent agent;
 agent.loadModel("models/gemma4.xyz.gguf");
-std::string reply = agent.chat("Hello!");
+std::string reply = agent.chat("Hello");
 Agent::shutdown();
 ```
 
