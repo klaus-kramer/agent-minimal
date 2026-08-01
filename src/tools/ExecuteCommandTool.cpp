@@ -235,18 +235,46 @@ static bool isCommandDenied(const std::string &cmd)
     for (auto &c : lower)
         c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 
-    std::string first;
-    for (char c : lower) {
-        if (c == ' ' || c == '\t' || c == '|' || c == ';' || c == '&' || c == '>' || c == '<')
-            break;
-        first += c;
+    auto stripExtension = [](std::string &s) {
+        static const char *exts[] = {".exe", ".com", ".bat", ".cmd", ".ps1"};
+        for (auto *ext : exts) {
+            if (s.size() > std::strlen(ext) &&
+                s.compare(s.size() - std::strlen(ext), std::strlen(ext), ext) == 0) {
+                s.resize(s.size() - std::strlen(ext));
+                return;
+            }
+        }
+    };
+
+    auto firstToken = [&](const std::string &text) -> std::string {
+        std::string first;
+        for (char c : text) {
+            if (c == ' ' || c == '\t' || c == '|' || c == ';' || c == '&' || c == '>' || c == '<')
+                break;
+            first += c;
+        }
+        if (first.size() >= 2 && first.front() == '"' && first.back() == '"')
+            first = first.substr(1, first.size() - 2);
+        stripExtension(first);
+        return first;
+    };
+
+    std::string first = firstToken(lower);
+
+    if (first == "cmd" || first == "cmd.exe") {
+        size_t cp = lower.find("/c");
+        if (cp != std::string::npos) {
+            size_t s = lower.find_first_not_of(" \t", cp + 2);
+            if (s != std::string::npos)
+                first = firstToken(lower.substr(s));
+        }
     }
 
     static const char *deniedCommands[] = {
         "format",  "diskpart", "shutdown", "reboot",   "regedit",
         "msiexec", "takeown",  "del",      "erase",    "rmdir",
         "rd",      "rm",       "rmtree",   "dd",       "mkfs",
-        "mke2fs",  "fdisk",    " parted",  " wipefs",
+        "mke2fs",  "fdisk",    "parted",   "wipefs",
     };
     for (auto *d : deniedCommands) {
         if (first == d) return true;

@@ -24,6 +24,40 @@ void setAllowedRoot(const std::string &path)
     getAllowedRoot() = fs::absolute(path);
 }
 
+static bool isAllowedPath(const fs::path &resolved, const fs::path &root, std::string &error)
+{
+    std::string rstr = resolved.string();
+    std::string rootStr = root.string();
+
+#ifdef _WIN32
+    for (auto &c : rstr) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    for (auto &c : rootStr) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+#endif
+
+    if (rstr.size() < rootStr.size() || rstr.compare(0, rootStr.size(), rootStr) != 0) {
+        error = "Access denied: path '" + resolved.string() + "' is outside the project directory ('" + root.string() + "')";
+        return false;
+    }
+
+    if (rstr.size() > rootStr.size() && rstr[rootStr.size()] != '/' && rstr[rootStr.size()] != '\\') {
+        error = "Access denied: path '" + resolved.string() + "' is outside the project directory ('" + root.string() + "')";
+        return false;
+    }
+
+    return true;
+}
+
+bool isPathAllowed(const std::string &path, std::string &error)
+{
+    try {
+        fs::path resolved = fs::absolute(path).lexically_normal();
+        return isAllowedPath(resolved, getAllowedRoot(), error);
+    } catch (const std::exception &e) {
+        error = e.what();
+        return false;
+    }
+}
+
 static fs::path resolveAndCheck(const fs::path& p)
 {
 #ifdef _WIN32
@@ -37,22 +71,9 @@ static fs::path resolveAndCheck(const fs::path& p)
 
     fs::path resolved = fs::absolute(p).lexically_normal();
 
-    auto root = getAllowedRoot().lexically_normal();
-    std::string rstr = resolved.string();
-    std::string rootStr = root.string();
-
-#ifdef _WIN32
-    for (auto &c : rstr) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    for (auto &c : rootStr) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-#endif
-
-    if (rstr.size() < rootStr.size() || rstr.compare(0, rootStr.size(), rootStr) != 0) {
-        throw std::runtime_error("Access denied: path '" + p.string() + "' is outside the project directory ('" + root.string() + "')");
-    }
-
-    if (rstr.size() > rootStr.size() && rstr[rootStr.size()] != '/' && rstr[rootStr.size()] != '\\') {
-        throw std::runtime_error("Access denied: path '" + p.string() + "' is outside the project directory ('" + root.string() + "')");
-    }
+    std::string error;
+    if (!isAllowedPath(resolved, getAllowedRoot(), error))
+        throw std::runtime_error(error);
 
     return resolved;
 }
@@ -146,6 +167,8 @@ static ToolResult writeFileTool(const ToolCall& call)
     std::string content = json_helper::extractToolArg(call.rawArguments, "content");
     if (path.empty()) return {false, "Missing parameter: path"};
     if (content.empty()) return {false, "Missing parameter: content"};
+    if (content.size() > MAX_WRITE_TOOL_BYTES)
+        return {false, "Content too large (" + std::to_string(content.size()) + " bytes). Max " + std::to_string(MAX_WRITE_TOOL_BYTES) + " bytes."};
 
     fs::path fp;
     try {

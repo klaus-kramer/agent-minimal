@@ -1,6 +1,7 @@
 ﻿// Copyright (c) 2026 Klaus Kramer - Licensed under the MIT License
 
 #include "SearchFilesTool.h"
+#include "FileTool.h"
 #include "core/JsonHelper.h"
 
 #include <regex>
@@ -63,6 +64,10 @@ static ToolResult searchFilesTool(const ToolCall &call)
             if (maxResults > MAX_FILES_LIMIT) maxResults = MAX_FILES_LIMIT;
         } catch (...) {}
     }
+
+    std::string accessError;
+    if (!isPathAllowed(searchPath, accessError))
+        return {false, accessError};
 
     fs::path root = fs::absolute(searchPath).lexically_normal();
     if (!fs::exists(root))

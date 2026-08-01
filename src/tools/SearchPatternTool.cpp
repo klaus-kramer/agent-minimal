@@ -1,6 +1,7 @@
 ﻿// Copyright (c) 2026 Klaus Kramer - Licensed under the MIT License
 
 #include "SearchPatternTool.h"
+#include "FileTool.h"
 #include "core/JsonHelper.h"
 
 #include <regex>
@@ -65,6 +66,10 @@ static ToolResult searchPatternTool(const ToolCall &call)
 
     if (searchPath.empty())
         searchPath = ".";
+
+    std::string accessError;
+    if (!isPathAllowed(searchPath, accessError))
+        return {false, accessError};
 
     fs::path root = fs::absolute(searchPath).lexically_normal();
     if (!fs::exists(root))

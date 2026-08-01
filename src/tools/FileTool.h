@@ -8,3 +8,7 @@
 void registerFileTools(ToolRegistry& registry);
 
 void setAllowedRoot(const std::string &path);
+
+// Returns true if the given path (relative or absolute) is inside the
+// allowed root. On failure, *error holds a human-readable reason.
+bool isPathAllowed(const std::string &path, std::string &error);
