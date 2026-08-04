@@ -81,3 +81,7 @@ Linux - `make` (or `ninja`), `pkg-config`, `libcurl` (for web tools)
 
 ## Tested With
 create models directory and download model. Developed and tested against gemma4-12B. Other models may work but are used without guarantees – template detection heuristics may not cover all formats.    
+
+## links:    
+my new ai Grimmelshausen https://huggingface.co/Klaus-Kramer/Grimmelshausen    
+my tool Vigil-Fluminis for Windows-security https://github.com/klaus-kramer/Vigil-Fluminis    
