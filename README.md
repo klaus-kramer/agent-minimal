@@ -7,8 +7,8 @@ A minimal, embeddable C++ local AI agent built on llama.cpp. It demonstrates too
 - Tool/function calling – Built-in file I/O, web fetch/search,  pattern search, command execution    
 - CUDA GPU acceleration – Automatic detection and enablement     
 - Interactive CLI – slash commands, parameter tuning, session management    
-- new command /think     
-- new tested with qwen3.8 27b    
+- NEW command /think     
+- NEW tested with qwen3.8 27b    
 
 ## Key Points:
 - Embeddable C++ library - `libagent_core` can be linked into any C++ application via `#include <core/Agent.h>`    
