@@ -4,9 +4,11 @@ A minimal, embeddable C++ local AI agent built on llama.cpp. It demonstrates too
 
 ## Features v0.2.0
 - Local LLM chat – Load GGUF model and chat interactively (atm recommended gemma4)    
-- Tool/function calling – Built-in file I/O, web fetch/search,  pattern search, command execution   
-- CUDA GPU acceleration – Automatic detection and enablement
-- Interactive CLI – slash commands, parameter tuning, session management
+- Tool/function calling – Built-in file I/O, web fetch/search,  pattern search, command execution    
+- CUDA GPU acceleration – Automatic detection and enablement     
+- Interactive CLI – slash commands, parameter tuning, session management    
+- new command /think     
+- new tested with qwen3.8 27b    
 
 ## Key Points:
 - Embeddable C++ library - `libagent_core` can be linked into any C++ application via `#include <core/Agent.h>`    
@@ -90,6 +92,3 @@ Other models may work but are used without guarantees – template detection heu
 my new ai Grimmelshausen https://huggingface.co/Klaus-Kramer/Grimmelshausen    
 my tool Vigil-Fluminis for Windows-security https://github.com/klaus-kramer/Vigil-Fluminis    
 
-##changes:
-new command /think    
-new tested with qwen3.8 27b    
