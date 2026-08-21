@@ -26,6 +26,7 @@ A minimal, embeddable C++ local AI agent built on llama.cpp. It demonstrates too
   /help              Show this help    
   /nosecurity        Toggle security confirmations off/on    
   /safe              Toggle read-only safe mode    
+  /think [on|off]    Toggle thinking (Qwen3: empty <think></think> prefill)    
 
 
 ## ai-assistant-tools inside (in agent-minimal type /tools):
@@ -80,8 +81,15 @@ Windows - Visual Studio 2022, CMake 3.20+, CUDA Toolkit(optional, for GPU accele
 Linux - `make` (or `ninja`), `pkg-config`, `libcurl` (for web tools)    
 
 ## Tested With
-create models directory and download model. Developed and tested against gemma4-12B. Other models may work but are used without guarantees – template detection heuristics may not cover all formats.    
+create models directory and download model. Developed and tested against:    
+gemma4-12B    
+qwen3.8 27b    
+Other models may work but are used without guarantees – template detection heuristics may not cover all formats.    
 
 ## links:    
 my new ai Grimmelshausen https://huggingface.co/Klaus-Kramer/Grimmelshausen    
 my tool Vigil-Fluminis for Windows-security https://github.com/klaus-kramer/Vigil-Fluminis    
+
+##changes:
+new command /think    
+new tested with qwen3.8 27b    
