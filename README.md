@@ -2,7 +2,7 @@
 A minimal, embeddable C++ local AI agent built on llama.cpp. It demonstrates tool calling and a clean architecture without heavy dependencies.
 
 
-## Features v0.2.0
+## Features v0.2.1
 - Local LLM chat – Load GGUF model and chat interactively (atm recommended gemma4)    
 - Tool/function calling – Built-in file I/O, web fetch/search,  pattern search, command execution    
 - CUDA GPU acceleration – Automatic detection and enablement     
