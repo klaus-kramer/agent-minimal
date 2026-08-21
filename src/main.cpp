@@ -54,6 +54,7 @@ static void printHelp(const char *argv0)
         << "  /temp <value>          Change temperature\n"
         << "  /help                  Show command help\n"
         << "  /safe                  Toggle read-only safe mode (blocks write/modify tools)\n"
+        << "  /think [on|off]        Toggle thinking (Qwen3: empty <think></think> prefill)\n"
         << std::endl;
 }
 
@@ -271,8 +272,9 @@ int main(int argc, char **argv)
                           << "Min-P:           " << sp.minP << "\n"
                           << "Repeat Penalty:  " << sp.repeatPenalty << "\n"
                           << "GPU Layers:      " << mparams.gpuLayers << "\n"
-                          << "Ctx Size:        " << mparams.contextSize << "\n"
-                          << "System Prompt:   " << agent.history().systemPrompt() << "\n";
+                        << "Ctx Size:        " << mparams.contextSize << "\n"
+                        << "Thinking:        " << (agent.thinkingEnabled() ? "on" : "off") << "\n"
+                        << "System Prompt:   " << agent.history().systemPrompt() << "\n";
             } else if (cmd == "temp" || cmd.rfind("temp ", 0) == 0) {
                 auto sp = agent.samplerParams();
                 std::string val = cmd.size() > 5 ? cmd.substr(5) : "";
@@ -302,13 +304,32 @@ int main(int argc, char **argv)
                     << "  /tools             List available AI tools\n"
                     << "  /help              Show this help\n"
                     << "  /nosecurity        Toggle security confirmations off/on\n"
-                    << "  /safe              Toggle read-only safe mode\n";
+                    << "  /safe              Toggle read-only safe mode\n"
+                    << "  /think [on|off]    Toggle thinking (Qwen3: empty <think></think> prefill)\n";
             } else if (cmd == "nosecurity") {
                 noSecurity = !noSecurity;
                 std::cout << (noSecurity ? "Security confirmations disabled.\n" : "Security confirmations enabled.\n");
             } else if (cmd == "safe") {
                 safeMode = !safeMode;
                 std::cout << (safeMode ? "Safe mode enabled: write/modify tools blocked.\n" : "Safe mode disabled: all tools available.\n");
+            } else if (cmd == "think" || cmd.rfind("think ", 0) == 0) {
+                std::string val = cmd.size() > 6 ? cmd.substr(6) : "";
+                if (!val.empty() && val[0] == ' ') val = val.substr(1);
+                bool enabled;
+                if (val == "on" || val == "true" || val == "1") {
+                    enabled = true;
+                } else if (val == "off" || val == "false" || val == "0") {
+                    enabled = false;
+                } else if (val.empty()) {
+                    enabled = !agent.thinkingEnabled();
+                } else {
+                    std::cerr << "Invalid value. Use /think [on|off].\n";
+                    continue;
+                }
+                agent.setThinkingEnabled(enabled);
+                std::cout << (enabled
+                    ? "Thinking enabled.\n"
+                    : "Thinking disabled (empty <think></think> prefill for Qwen3).\n");
             } else {
                 std::cerr << "Unknown command: " << cmd << "  (/help for help)\n";
             }
