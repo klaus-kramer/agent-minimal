@@ -31,6 +31,7 @@ bool Sampler::init(const llama_vocab *vocab, const Params &params)
     if (params.repeatPenalty != 1.0f || params.freqPenalty != 0.0f || params.presencePenalty != 0.0f) {
         llama_sampler_chain_add(m_chain,
             llama_sampler_init_penalties(
+                llama_vocab_n_tokens(vocab),
                 params.penaltyLastN,
                 params.repeatPenalty,
                 params.freqPenalty,

@@ -45,8 +45,10 @@ public:
     void setSamplerParams(const Sampler::Params &params);
     Sampler::Params samplerParams() const;
 
-    void setToolRegistry(ToolRegistry *registry);
+    void setThinkingEnabled(bool enabled);
+    bool thinkingEnabled() const;
 
+    void setToolRegistry(ToolRegistry *registry);
     std::string chat(const std::string &userMessage,
                      ToolResolveCallback onToolResolve = defaultRejectTool);
 
@@ -62,6 +64,8 @@ public:
     int remainingContext() const;
 
 private:
+    bool isQwenFamily() const;
+
     void runChat(const std::string &userMessage,
                  TokenCallback      onToken,
                  ToolResolveCallback onToolResolve,
@@ -73,6 +77,7 @@ private:
     Sampler::Params m_samplerParams;
     ChatHistory  m_history;
     bool         m_running = false;
+    bool         m_thinkingEnabled = true;
     std::string  m_lastError;
     ToolRegistry *m_toolRegistry = nullptr;
     std::atomic<bool> m_cancelled{false};

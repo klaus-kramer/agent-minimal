@@ -108,6 +108,24 @@ Sampler::Params Agent::samplerParams() const
     return m_samplerParams;
 }
 
+void Agent::setThinkingEnabled(bool enabled)
+{
+    m_thinkingEnabled = enabled;
+}
+
+bool Agent::thinkingEnabled() const
+{
+    return m_thinkingEnabled;
+}
+
+bool Agent::isQwenFamily() const
+{
+    std::string name = m_model.name();
+    for (auto &c : name)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return name.find("qwen") != std::string::npos;
+}
+
 void Agent::setToolRegistry(ToolRegistry *registry)
 {
     m_toolRegistry = registry;
@@ -173,6 +191,13 @@ void Agent::runChat(const std::string &userMessage,
     try {
         m_history.addMessage("user", userMessage);
 
+        auto buildPrompt = [this]() -> std::string {
+            std::string p = m_history.applyTemplate(m_model, true);
+            if (!m_thinkingEnabled && isQwenFamily())
+                p += "<think>\n\n</think>\n\n";
+            return p;
+        };
+
         if (!m_sampler.isValid())
             m_sampler.init(m_model.vocab(), m_samplerParams);
 
@@ -209,7 +234,7 @@ void Agent::runChat(const std::string &userMessage,
             if (m_bypassTemplate && !m_firstPassPrompt.empty()) {
                 prompt = m_firstPassPrompt + m_toolContextSuffix;
             } else {
-                prompt = m_history.applyTemplate(m_model, true);
+                prompt = buildPrompt();
                 if (m_firstPassPrompt.empty() && !prompt.empty()) {
                     m_firstPassPrompt = prompt;
                 }
@@ -249,7 +274,7 @@ void Agent::runChat(const std::string &userMessage,
                     }
                     if (nTokens < 0) {
                         m_history.trimToFit(m_model, maxPrompt);
-                        prompt = m_history.applyTemplate(m_model, true);
+                        prompt = buildPrompt();
                         m_firstPassPrompt = prompt;
                         m_toolContextSuffix.clear();
                         m_bypassTemplate = false;
@@ -262,7 +287,7 @@ void Agent::runChat(const std::string &userMessage,
                         std::cerr << "\n[Context near capacity - tool output was trimmed]\n";
                 } else {
                     m_history.trimToFit(m_model, maxPrompt);
-                    prompt = m_history.applyTemplate(m_model, true);
+                    prompt = buildPrompt();
                     nTokens = llama_tokenize(vocab,
                         prompt.c_str(), static_cast<int>(prompt.size()),
                         tokens.data(), static_cast<int>(tokens.size()),
