@@ -35,7 +35,7 @@ unsigned int parseUint(const std::string& s, unsigned int defaultVal) {
 bool parseBool(const std::string& s, bool defaultVal) {
     if (s.empty()) return defaultVal;
     std::string lower = s;
-    for (auto& c : lower) c = std::tolower(c);
+    for (auto& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     return lower == "true" || lower == "1" || lower == "yes";
 }
 

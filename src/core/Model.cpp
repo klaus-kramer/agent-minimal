@@ -13,6 +13,7 @@ Model::~Model()
 Model::Model(Model &&other) noexcept
     : m_model(other.m_model)
     , m_ctx(other.m_ctx)
+    , m_params(other.m_params)
     , m_lastError(std::move(other.m_lastError))
 {
     other.m_model = nullptr;
@@ -25,6 +26,7 @@ Model &Model::operator=(Model &&other) noexcept
         freeResources();
         m_model     = other.m_model;
         m_ctx       = other.m_ctx;
+        m_params    = other.m_params;
         m_lastError = std::move(other.m_lastError);
         other.m_model = nullptr;
         other.m_ctx   = nullptr;

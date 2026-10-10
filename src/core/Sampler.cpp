@@ -22,12 +22,12 @@ bool Sampler::init(const llama_vocab *vocab, const Params &params)
 
     auto sparams = llama_sampler_chain_default_params();
     m_chain = llama_sampler_chain_init(sparams);
+    if (!m_chain)
+        return false;
 
-    llama_sampler_chain_add(m_chain, llama_sampler_init_top_k(params.topK));
-    llama_sampler_chain_add(m_chain, llama_sampler_init_top_p(params.topP, 1));
-    llama_sampler_chain_add(m_chain, llama_sampler_init_min_p(params.minP, 1));
-    llama_sampler_chain_add(m_chain, llama_sampler_init_temp(params.temperature));
-
+    // Penalties must be applied before the truncation samplers (top-k/top-p/
+    // min-p) and before temperature, otherwise they operate on probabilities
+    // that have already been reshaped/truncated.
     if (params.repeatPenalty != 1.0f || params.freqPenalty != 0.0f || params.presencePenalty != 0.0f) {
         llama_sampler_chain_add(m_chain,
             llama_sampler_init_penalties(
@@ -37,6 +37,11 @@ bool Sampler::init(const llama_vocab *vocab, const Params &params)
                 params.freqPenalty,
                 params.presencePenalty));
     }
+
+    llama_sampler_chain_add(m_chain, llama_sampler_init_top_k(params.topK));
+    llama_sampler_chain_add(m_chain, llama_sampler_init_top_p(params.topP, 1));
+    llama_sampler_chain_add(m_chain, llama_sampler_init_min_p(params.minP, 1));
+    llama_sampler_chain_add(m_chain, llama_sampler_init_temp(params.temperature));
 
     llama_sampler_chain_add(m_chain, llama_sampler_init_dist(seed));
 

@@ -38,7 +38,7 @@ void Agent::init()
 void Agent::shutdown()
 {
     std::lock_guard<std::mutex> lock(s_llamaMutex);
-    if (--s_llamaRefCount == 0)
+    if (s_llamaRefCount > 0 && --s_llamaRefCount == 0)
         llama_backend_free();
 }
 
@@ -138,6 +138,15 @@ std::string Agent::chat(const std::string &userMessage,
         m_lastError = "No model loaded";
         return {};
     }
+    if (m_running) {
+        m_lastError = "Generation already in progress";
+        return {};
+    }
+    if (m_worker.joinable())
+        m_worker.join();
+
+    m_running = true;
+    m_cancelled = false;
 
     std::string result;
     std::string error;
