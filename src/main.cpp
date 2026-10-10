@@ -70,7 +70,7 @@ static void listModels()
     int count = 0;
     for (auto &entry : std::filesystem::directory_iterator(dir)) {
         auto ext = entry.path().extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        for (auto &c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         if (ext == ".gguf") {
             std::cout << "  " << entry.path().filename().string() << "\n";
             ++count;
