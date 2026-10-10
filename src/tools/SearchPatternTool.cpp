@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <algorithm>
 #include <cctype>
+#include <optional>
 
 namespace fs = std::filesystem;
 
@@ -45,14 +46,11 @@ static std::string globToRegex(const std::string &glob)
     return re;
 }
 
-static bool matchesFilter(const fs::path &filePath, const std::string &includePattern)
+static bool matchesFilter(const fs::path &filePath, const std::regex *filterRe)
 {
-    if (includePattern.empty())
+    if (!filterRe)
         return true;
-
-    std::string filename = filePath.filename().string();
-    std::regex filterRe(globToRegex(includePattern), std::regex::icase);
-    return std::regex_match(filename, filterRe);
+    return std::regex_match(filePath.filename().string(), *filterRe);
 }
 
 static ToolResult searchPatternTool(const ToolCall &call)
@@ -82,6 +80,16 @@ static ToolResult searchPatternTool(const ToolCall &call)
         re = std::regex(pattern, std::regex::ECMAScript | std::regex::icase);
     } catch (const std::regex_error &e) {
         return {false, "Invalid regex pattern: " + std::string(e.what())};
+    }
+
+    // Compile the include filter only once instead of per file.
+    std::optional<std::regex> filterRe;
+    if (!includeFilter.empty()) {
+        try {
+            filterRe.emplace(globToRegex(includeFilter), std::regex::icase);
+        } catch (const std::regex_error &e) {
+            return {false, "Invalid include pattern: " + std::string(e.what())};
+        }
     }
 
     std::ostringstream os;
@@ -117,11 +125,11 @@ static ToolResult searchPatternTool(const ToolCall &call)
 
         if (fs::file_size(entry.path()) > MAX_SEARCH_FILE_SIZE)
             continue;
-        if (!matchesFilter(entry.path(), includeFilter))
+        if (!matchesFilter(entry.path(), filterRe ? &*filterRe : nullptr))
             continue;
 
         auto ext = entry.path().extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        for (auto &c : ext) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         static const char *binaryExts[] = {
             ".exe", ".dll", ".obj", ".lib", ".pdb", ".png", ".jpg",
             ".jpeg", ".gif", ".bmp", ".ico", ".zip", ".7z", ".gz",

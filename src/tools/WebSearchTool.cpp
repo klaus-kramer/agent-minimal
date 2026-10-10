@@ -60,7 +60,6 @@ static std::string httpGetSearch(const std::string &url, int timeoutSec)
         return {};
     }
 
-    LPCWSTR acceptTypes[] = { L"*/*", NULL };
     DWORD decompressFlag = WINHTTP_DECOMPRESSION_FLAG_ALL;
     WinHttpSetOption(hRequest, WINHTTP_OPTION_DECOMPRESSION, &decompressFlag, sizeof(decompressFlag));
 

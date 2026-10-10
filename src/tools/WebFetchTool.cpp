@@ -60,7 +60,6 @@ static ToolResult fetchViaWinHTTP(const std::string &url, int timeoutSec)
         return {false, "WinHttpOpenRequest failed"};
     }
 
-    LPCWSTR acceptTypes[] = { L"*/*", NULL };
     DWORD decompressFlag = WINHTTP_DECOMPRESSION_FLAG_ALL;
     WinHttpSetOption(hRequest, WINHTTP_OPTION_DECOMPRESSION, &decompressFlag, sizeof(decompressFlag));
 
@@ -165,10 +164,6 @@ static ToolResult webFetchTool(const ToolCall &call)
     std::string timeoutStr = json_helper::extractToolArg(call.rawArguments, "timeout");
     if (!timeoutStr.empty()) {
         try { timeoutSec = std::stoi(timeoutStr); } catch (...) {}
-    }
-
-    if (url.empty()) {
-        return {false, "Empty URL"};
     }
 
     if (url.rfind("http://", 0) != 0 && url.rfind("https://", 0) != 0) {
