@@ -38,6 +38,8 @@ add_library(agent_core STATIC
     src/core/ToolRegistry.h
     src/core/ToolRegistry.cpp
     src/core/JsonHelper.h
+    src/core/Config.h
+    src/core/Config.cpp
 )
 target_include_directories(agent_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(agent_core PUBLIC llama)
@@ -60,13 +62,15 @@ add_library(agent_tools STATIC
 target_include_directories(agent_tools PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(agent_tools PUBLIC agent_core)
 
+if(WIN32)
+    # WebFetch/WebSearch use the WinHTTP API; link here so that agent_tools
+    # is self-contained for embedders (not only for the CLI executable).
+    target_link_libraries(agent_tools PUBLIC winhttp)
+endif()
+
 # ── CLI executable (thin consumer) ─────────────────────────────────
 add_executable(agent_minimal src/main.cpp)
 target_link_libraries(agent_minimal PRIVATE agent_tools)
-
-if(WIN32)
-    target_link_libraries(agent_minimal PRIVATE winhttp)
-endif()
 
 # ── Windows: copy llama.cpp DLLs to executable output ──────────────
 if(WIN32)
