@@ -88,6 +88,10 @@ gemma4-12B
 qwen3.8 27b    
 Other models may work but are used without guarantees – template detection heuristics may not cover all formats.    
 
+## changelog:
+v0.2.2: terminated bugs    
+
+
 ## links:    
 my new ai Grimmelshausen https://huggingface.co/Klaus-Kramer/Grimmelshausen    
 my tool Vigil-Fluminis for Windows-security https://github.com/klaus-kramer/Vigil-Fluminis    
