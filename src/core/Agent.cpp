@@ -20,6 +20,41 @@ static int s_llamaRefCount = 0;
 
 static constexpr size_t MAX_TOOL_RESULT_CHARS = 16384;
 
+namespace {
+
+// The bypass template path splices assistant/tool turns into the prompt with
+// raw markers. These differ per model family: Gemma4 uses <|turn>...</turn|>
+// turns, everything that falls back to the built-in ChatML template uses
+// <|im_start|>/<|im_end|>. Using the wrong markers poisons the context after
+// the first tool result and degrades generation.
+struct ToolTurnMarkers {
+    const char * assistantClose; // closes the assistant turn that called a tool
+    const char * toolOpen;       // opens the tool-result turn
+    const char * toolClose;      // closes the tool-result turn
+    const char * modelOpen;      // resumes the assistant turn
+    bool rawBlobHistory;         // Gemma4: keep tool turns inline in one history message
+};
+
+ToolTurnMarkers toolTurnMarkersFor(const std::string &modelName)
+{
+    std::string name = modelName;
+    for (auto &c : name)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+    const bool gemma4 = name.find("gemma4")  != std::string::npos ||
+                        name.find("gemma-4") != std::string::npos ||
+                        name.find("gemma 4") != std::string::npos;
+
+    if (gemma4) {
+        return { "<turn|>\n", "<|turn>tool\n", "<turn|>\n", "<|turn>model\n", true };
+    }
+
+    // Default: built-in ChatML template (<|im_start|>role ... <|im_end|>).
+    return { "\n<|im_end|>\n", "<|im_start|>tool\n", "<|im_end|>\n", "<|im_start|>assistant\n", false };
+}
+
+} // namespace
+
 static void agentLogCallback(ggml_log_level level, const char * text, void * /*user_data*/)
 {
     if (text && level >= GGML_LOG_LEVEL_INFO)
@@ -126,6 +161,16 @@ bool Agent::isQwenFamily() const
     return name.find("qwen") != std::string::npos;
 }
 
+bool Agent::isGemma4Family() const
+{
+    std::string name = m_model.name();
+    for (auto &c : name)
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return name.find("gemma4")  != std::string::npos ||
+           name.find("gemma-4") != std::string::npos ||
+           name.find("gemma 4") != std::string::npos;
+}
+
 void Agent::setToolRegistry(ToolRegistry *registry)
 {
     m_toolRegistry = registry;
@@ -197,6 +242,7 @@ void Agent::runChat(const std::string &userMessage,
     m_firstPassPrompt.clear();
     m_bypassTemplate = false;
     m_toolContextSuffix.clear();
+    m_toolSteps.clear();
     try {
         m_history.addMessage("user", userMessage);
 
@@ -212,6 +258,7 @@ void Agent::runChat(const std::string &userMessage,
 
         bool toolsActive = m_toolRegistry && !m_toolRegistry->isEmpty();
         std::string savedSystem = m_history.systemPrompt();
+        const ToolTurnMarkers markers = toolTurnMarkersFor(m_model.name());
         int toolIter = 0;
         const int MAX_TOOL_ITERS = 5;
 
@@ -260,7 +307,9 @@ void Agent::runChat(const std::string &userMessage,
                     // Shrink the tool context suffix (drop from the front) until
                     // the prompt fits, instead of silently discarding the tool
                     // result. The trailing model marker is preserved.
-                    const std::string modelOpen = "\n<|turn>model\n";
+                    const std::string modelOpen = markers.rawBlobHistory
+                        ? "\n<|turn>model\n"
+                        : "\n<|im_start|>assistant\n";
                     while (nTokens < 0 && !m_toolContextSuffix.empty()) {
                         size_t cut = std::max<size_t>(1, m_toolContextSuffix.size() / 4);
                         m_toolContextSuffix.erase(0, cut);
@@ -579,13 +628,19 @@ void Agent::runChat(const std::string &userMessage,
                         }
                     }
 
+                    if (!markers.rawBlobHistory) {
+                        if (m_toolSteps.empty() || m_toolSteps.back().first != asstText)
+                            m_toolSteps.push_back({asstText, {}});
+                        m_toolSteps.back().second.push_back(toolOutput);
+                    }
+
                     std::string toolResultStr
                         = asstText
-                        + "<turn|>\n"
-                        + "<|turn>tool\n"
+                        + markers.assistantClose
+                        + markers.toolOpen
                         + toolOutput
-                        + "<turn|>\n"
-                        + "<|turn>model\n"
+                        + markers.toolClose
+                        + markers.modelOpen
                         + "Tool call executed. If you have enough information, provide your final answer now. "
                           "Call more tools only if you still need additional information.\n";
                     m_toolContextSuffix += toolResultStr;
@@ -635,8 +690,20 @@ void Agent::runChat(const std::string &userMessage,
             }
 
             if (m_bypassTemplate) {
-                std::string fullInteraction = m_toolContextSuffix + response;
-                m_history.addMessage("assistant", fullInteraction);
+                if (markers.rawBlobHistory) {
+                    std::string fullInteraction = m_toolContextSuffix + response;
+                    m_history.addMessage("assistant", fullInteraction);
+                } else {
+                    // ChatML-family models re-render each turn from history on
+                    // the next user message, so store the tool use as separate
+                    // assistant/tool messages instead of one raw marker blob.
+                    for (const auto &step : m_toolSteps) {
+                        m_history.addMessage("assistant", step.first);
+                        for (const auto &out : step.second)
+                            m_history.addMessage("tool", out);
+                    }
+                    m_history.addMessage("assistant", response);
+                }
             } else {
                 m_history.addMessage("assistant", response);
             }
