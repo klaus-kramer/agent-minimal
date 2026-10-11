@@ -1,6 +1,4 @@
-﻿// Copyright (c) 2026 Klaus Kramer - Licensed under the MIT License
-
-#include "Model.h"
+﻿#include "Model.h"
 
 #include <cstring>
 #include <algorithm>

@@ -1,6 +1,4 @@
-﻿// Copyright (c) 2026 Klaus Kramer - Licensed under the MIT License
-
-#include "ToolRegistry.h"
+﻿#include "ToolRegistry.h"
 #include "JsonHelper.h"
 #include <sstream>
 

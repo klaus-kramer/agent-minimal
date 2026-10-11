@@ -1,6 +1,4 @@
-﻿// Copyright (c) 2026 Klaus Kramer - Licensed under the MIT License
-
-#pragma once
+﻿#pragma once
 
 #include <string>
 #include <functional>
@@ -91,7 +89,5 @@ private:
     std::string  m_toolContextSuffix;
     bool         m_bypassTemplate = false;
 
-    // For non-Gemma4 models the chat template renders each turn separately,
-    // so tool use is stored as distinct assistant/tool history messages.
     std::vector<std::pair<std::string, std::vector<std::string>>> m_toolSteps;
 };

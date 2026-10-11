@@ -1,6 +1,4 @@
-﻿// Copyright (c) 2026 Klaus Kramer - Licensed under the MIT License
-
-#include "Sampler.h"
+﻿#include "Sampler.h"
 
 #include <random>
 
@@ -25,9 +23,6 @@ bool Sampler::init(const llama_vocab *vocab, const Params &params)
     if (!m_chain)
         return false;
 
-    // Penalties must be applied before the truncation samplers (top-k/top-p/
-    // min-p) and before temperature, otherwise they operate on probabilities
-    // that have already been reshaped/truncated.
     if (params.repeatPenalty != 1.0f || params.freqPenalty != 0.0f || params.presencePenalty != 0.0f) {
         llama_sampler_chain_add(m_chain,
             llama_sampler_init_penalties(

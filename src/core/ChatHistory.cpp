@@ -1,6 +1,4 @@
-﻿// Copyright (c) 2026 Klaus Kramer - Licensed under the MIT License
-
-#include "ChatHistory.h"
+﻿#include "ChatHistory.h"
 #include "Model.h"
 
 #include <algorithm>
