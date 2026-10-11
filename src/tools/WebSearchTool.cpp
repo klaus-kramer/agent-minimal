@@ -1,6 +1,4 @@
-﻿// Copyright (c) 2026 Klaus Kramer - Licensed under the MIT License
-
-#include "WebSearchTool.h"
+﻿#include "WebSearchTool.h"
 #include "core/JsonHelper.h"
 
 #include <regex>

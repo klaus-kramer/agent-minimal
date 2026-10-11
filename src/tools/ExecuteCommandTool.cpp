@@ -1,6 +1,4 @@
-﻿// Copyright (c) 2026 Klaus Kramer - Licensed under the MIT License
-
-#include "ExecuteCommandTool.h"
+﻿#include "ExecuteCommandTool.h"
 #include "core/JsonHelper.h"
 
 #include <sstream>

@@ -1,6 +1,4 @@
-﻿// Copyright (c) 2026 Klaus Kramer - Licensed under the MIT License
-
-#include "FileTool.h"
+﻿#include "FileTool.h"
 #include "core/JsonHelper.h"
 #include <fstream>
 #include <sstream>

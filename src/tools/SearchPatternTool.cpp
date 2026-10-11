@@ -1,6 +1,4 @@
-﻿// Copyright (c) 2026 Klaus Kramer - Licensed under the MIT License
-
-#include "SearchPatternTool.h"
+﻿#include "SearchPatternTool.h"
 #include "FileTool.h"
 #include "core/JsonHelper.h"
 
@@ -82,7 +80,6 @@ static ToolResult searchPatternTool(const ToolCall &call)
         return {false, "Invalid regex pattern: " + std::string(e.what())};
     }
 
-    // Compile the include filter only once instead of per file.
     std::optional<std::regex> filterRe;
     if (!includeFilter.empty()) {
         try {

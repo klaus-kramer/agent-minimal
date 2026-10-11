@@ -1,6 +1,4 @@
-﻿// Copyright (c) 2026 Klaus Kramer - Licensed under the MIT License
-
-#include "WebFetchTool.h"
+﻿#include "WebFetchTool.h"
 #include "core/JsonHelper.h"
 
 #include <sstream>

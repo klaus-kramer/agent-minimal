@@ -1,6 +1,4 @@
-﻿// Copyright (c) 2026 Klaus Kramer - Licensed under the MIT License
-
-#include "SearchFilesTool.h"
+﻿#include "SearchFilesTool.h"
 #include "FileTool.h"
 #include "core/JsonHelper.h"
 
