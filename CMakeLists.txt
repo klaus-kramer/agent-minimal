@@ -14,6 +14,8 @@ FetchContent_Declare(llama
 set(LLAMA_BUILD_TESTS   OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(LLAMA_BUILD_SERVER  OFF CACHE BOOL "" FORCE)
+# Needed for kwargs-capable chat templates (common_chat_templates_apply).
+set(LLAMA_BUILD_COMMON  ON  CACHE BOOL "" FORCE)
 
 find_package(CUDAToolkit QUIET)
 if(CUDAToolkit_FOUND)
@@ -42,7 +44,7 @@ add_library(agent_core STATIC
     src/core/Config.cpp
 )
 target_include_directories(agent_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(agent_core PUBLIC llama)
+target_link_libraries(agent_core PUBLIC llama llama-common)
 
 # ── Tools library (optional for embedders who want built-in tools) ──
 add_library(agent_tools STATIC
@@ -87,6 +89,9 @@ if(WIN32)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_BINARY_DIR}/bin/$<CONFIG>/ggml-cpu.dll"
             "$<TARGET_FILE_DIR:agent_minimal>/ggml-cpu.dll"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_BINARY_DIR}/bin/$<CONFIG>/llama-common.dll"
+            "$<TARGET_FILE_DIR:agent_minimal>/llama-common.dll"
         COMMENT "Copy llama.cpp DLLs"
     )
     if(CUDAToolkit_FOUND)
