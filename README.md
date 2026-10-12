@@ -14,7 +14,7 @@ A minimal, embeddable C++ local AI agent built on llama.cpp. It demonstrates too
 - Zero runtime dependencies - No Python, no Node, no Docker – just the binary + a `.gguf` file    
 - Portable single binary - The CLI is a thin client; the library is the product    
 - Fully offline - Runs entirely without internet access    
-- ~5 MB footprint - Minimal codebase
+- Minimal codebase
 
 
 ## commands:
