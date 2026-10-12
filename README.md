@@ -2,7 +2,7 @@
 A minimal, embeddable C++ local AI agent built on llama.cpp. It demonstrates tool calling and a clean architecture without heavy dependencies.
 
 
-## Features v0.2.3
+## Features v0.3.0
 - Local LLM chat – Load GGUF model and chat interactively (atm recommended gemma4)    
 - Tool/function calling – Built-in file I/O, web fetch/search,  pattern search, command execution    
 - CUDA GPU acceleration – Automatic detection and enablement     
@@ -51,7 +51,9 @@ A minimal, embeddable C++ local AI agent built on llama.cpp. It demonstrates too
 - gpulayer -ngl (example -ngl 99)
 - systemtext -s
 - listmodels -l
-- help -h    
+- help -h
+- reasoning-effort --reasoning-effort (example --reasoning-effort low, Qwen3: xhigh|medium|low)    
+- template-kwarg   --template-kwarg KEY=VALUE (repeatable, e.g. --template-kwarg reasoning_effort=low)    
   
 
 ## Quick Start (for library user)
@@ -91,6 +93,7 @@ Other models may work but are used without guarantees – template detection heu
 ## changelog:
 v0.2.2: terminated bugs    
 v0.2.3: terminated more bugs    
+v0.3.0: new CLI-parameter --reasoning-effort and --template-kwarg    
 
 ## links:    
 my new ai Grimmelshausen https://huggingface.co/Klaus-Kramer/Grimmelshausen    
