@@ -292,4 +292,41 @@ inline std::vector<std::string> extractStringArray(const std::string &s, const s
     return result;
 }
 
+// Converts a raw CLI/config value into a JSON literal placeholder that
+// common_chat_templates_apply (which runs json::parse on every kwarg value)
+// accepts: a bareword like "low" becomes the JSON string "low", while
+// "false", "42" or "{}" are passed through unchanged.
+inline std::string toJsonLiteral(const std::string &value)
+{
+    size_t a = skipWhitespace(value, 0);
+    size_t b = value.size();
+    while (b > a && (value[b - 1] == ' ' || value[b - 1] == '\t' ||
+                     value[b - 1] == '\n' || value[b - 1] == '\r'))
+        --b;
+    std::string v = value.substr(a, b - a);
+    if (v.empty()) return "\"\"";
+    if (v == "true" || v == "false" || v == "null") return v;
+    if (v[0] == '{' || v[0] == '[' || v[0] == '"') return v;
+
+    bool isNumber = true;
+    for (char c : v) {
+        if (!(std::isdigit(static_cast<unsigned char>(c)) || c == '.' || c == '-' ||
+              c == '+' || c == 'e' || c == 'E')) {
+            isNumber = false;
+            break;
+        }
+    }
+    if (isNumber) return v;
+
+    std::string out;
+    out.reserve(v.size() + 2);
+    out += '"';
+    for (char c : v) {
+        if (c == '"' || c == '\\') out += '\\';
+        out += c;
+    }
+    out += '"';
+    return out;
+}
+
 }

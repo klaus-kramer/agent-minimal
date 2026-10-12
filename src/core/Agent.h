@@ -6,6 +6,7 @@
 #include <atomic>
 #include <thread>
 #include <vector>
+#include <map>
 #include <utility>
 
 #include "Model.h"
@@ -47,6 +48,9 @@ public:
 
     void setThinkingEnabled(bool enabled);
     bool thinkingEnabled() const;
+
+    void setTemplateKwargs(const std::map<std::string, std::string> &kwargs);
+    std::map<std::string, std::string> templateKwargs() const;
 
     void setToolRegistry(ToolRegistry *registry);
     std::string chat(const std::string &userMessage,

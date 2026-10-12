@@ -145,6 +145,16 @@ bool Agent::thinkingEnabled() const
     return m_thinkingEnabled;
 }
 
+void Agent::setTemplateKwargs(const std::map<std::string, std::string> &kwargs)
+{
+    m_history.setTemplateKwargs(kwargs);
+}
+
+std::map<std::string, std::string> Agent::templateKwargs() const
+{
+    return m_history.templateKwargs();
+}
+
 bool Agent::isQwenFamily() const
 {
     std::string name = m_model.name();

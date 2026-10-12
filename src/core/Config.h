@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <map>
 #include <optional>
 
 namespace agent {
@@ -41,6 +42,7 @@ struct AgentConfig {
     SamplerConfig sampler;
     ToolConfig tools;
     std::string systemPrompt;
+    std::map<std::string, std::string> templateKwargs;
 };
 
 std::optional<AgentConfig> loadConfig(const std::string& configPath);

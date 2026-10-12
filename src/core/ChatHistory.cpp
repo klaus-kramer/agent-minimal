@@ -1,9 +1,12 @@
 ﻿#include "ChatHistory.h"
 #include "Model.h"
 
+#include "chat.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cstring>
+#include <utility>
 
 void ChatHistory::setSystemPrompt(const std::string &prompt)
 {
@@ -13,6 +16,16 @@ void ChatHistory::setSystemPrompt(const std::string &prompt)
 std::string ChatHistory::systemPrompt() const
 {
     return m_systemPrompt;
+}
+
+void ChatHistory::setTemplateKwargs(const std::map<std::string, std::string> &kwargs)
+{
+    m_templateKwargs = kwargs;
+}
+
+const std::map<std::string, std::string> &ChatHistory::templateKwargs() const
+{
+    return m_templateKwargs;
 }
 
 void ChatHistory::addMessage(const std::string &role, const std::string &content)
@@ -102,8 +115,57 @@ static std::string detectBuiltinTemplate(const Model &model)
     return t ? std::string(t) : std::string();
 }
 
+// Renders the model's own Jinja template via llama-common so that arbitrary
+// chat-template kwargs (enable_thinking, reasoning_effort, ...) are honored.
+// Returns an empty string on failure so callers can fall back.
+static std::string applyTemplateWithKwargs(
+    const Model &model,
+    const std::string &systemPrompt,
+    const std::vector<ChatHistory::Message> &messages,
+    bool addAssistant,
+    const std::map<std::string, std::string> &kwargs)
+{
+    try {
+        auto tmpls = common_chat_templates_init(model.model(), "", "", "");
+        if (!tmpls)
+            return {};
+
+        std::vector<common_chat_msg> msgs;
+        msgs.reserve(messages.size() + (systemPrompt.empty() ? 0 : 1));
+        if (!systemPrompt.empty()) {
+            common_chat_msg m;
+            m.role = "system";
+            m.content = systemPrompt;
+            msgs.push_back(std::move(m));
+        }
+        for (const auto &msg : messages) {
+            common_chat_msg m;
+            m.role = msg.role;
+            m.content = msg.content;
+            msgs.push_back(std::move(m));
+        }
+
+        common_chat_templates_inputs inputs;
+        inputs.messages = std::move(msgs);
+        inputs.add_generation_prompt = addAssistant;
+        inputs.use_jinja = true;
+        inputs.chat_template_kwargs = kwargs;
+
+        return common_chat_templates_apply(tmpls.get(), inputs).prompt;
+    } catch (...) {
+        return {};
+    }
+}
+
 std::string ChatHistory::applyTemplate(const Model &model, bool addAssistant) const
 {
+    if (!m_templateKwargs.empty()) {
+        std::string prompt = applyTemplateWithKwargs(
+            model, m_systemPrompt, m_messages, addAssistant, m_templateKwargs);
+        if (!prompt.empty())
+            return prompt;
+    }
+
     if (isGemma4(model)) {
         return buildGemma4Prompt(m_systemPrompt, m_messages, addAssistant);
     }

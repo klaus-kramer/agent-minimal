@@ -37,6 +37,41 @@ bool parseBool(const std::string& s, bool defaultVal) {
     return lower == "true" || lower == "1" || lower == "yes";
 }
 
+std::string trimValue(const std::string& s) {
+    size_t a = json_helper::skipWhitespace(s, 0);
+    size_t b = s.size();
+    while (b > a && (s[b - 1] == ' ' || s[b - 1] == '\t' || s[b - 1] == '\n' || s[b - 1] == '\r'))
+        --b;
+    return s.substr(a, b - a);
+}
+
+// Parses a flat JSON object into key -> raw JSON value pairs. Values are kept
+// verbatim so their JSON type (string/number/bool/object) is preserved for
+// common_chat_templates_apply.
+std::map<std::string, std::string> parseStringMap(const std::string& obj) {
+    std::map<std::string, std::string> out;
+    size_t pos = json_helper::skipWhitespace(obj, 0);
+    if (pos >= obj.size() || obj[pos] != '{') return out;
+    ++pos;
+    while (pos < obj.size()) {
+        pos = json_helper::skipWhitespace(obj, pos);
+        if (pos >= obj.size() || obj[pos] == '}') break;
+        if (obj[pos] == ',') { ++pos; continue; }
+        if (obj[pos] != '"') break;
+        size_t keyEnd = json_helper::findStringEnd(obj, pos);
+        if (keyEnd == std::string::npos) break;
+        std::string key = json_helper::unescapeJsonString(obj.substr(pos + 1, keyEnd - pos - 2));
+        pos = json_helper::skipWhitespace(obj, keyEnd);
+        if (pos >= obj.size() || obj[pos] != ':') break;
+        pos = json_helper::skipWhitespace(obj, pos + 1);
+        size_t valEnd = json_helper::findValueEnd(obj, pos);
+        if (valEnd == std::string::npos) break;
+        out[key] = trimValue(obj.substr(pos, valEnd - pos));
+        pos = valEnd;
+    }
+    return out;
+}
+
 }
 
 std::optional<AgentConfig> loadConfig(const std::string& configPath) {
@@ -85,6 +120,11 @@ std::optional<AgentConfig> loadConfig(const std::string& configPath) {
 
     cfg.systemPrompt = json_helper::extractStringValue(content, "systemPrompt");
 
+    cfg.templateKwargs = parseStringMap(json_helper::extractObjectValue(content, "templateKwargs"));
+    std::string reasoningEffort = json_helper::extractStringValue(content, "reasoningEffort");
+    if (!reasoningEffort.empty() && cfg.templateKwargs.find("reasoning_effort") == cfg.templateKwargs.end())
+        cfg.templateKwargs["reasoning_effort"] = json_helper::toJsonLiteral(reasoningEffort);
+
     return cfg;
 }
 
@@ -118,7 +158,8 @@ bool saveConfigExample(const std::string& configPath) {
     "enableSearchFiles": true,
     "allowedRoot": ""
   },
-  "systemPrompt": "You are a helpful AI assistant."
+  "systemPrompt": "You are a helpful AI assistant.",
+    "templateKwargs": {}
 })";
 
     std::ofstream file(configPath);

@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <string>
+#include <map>
 #include <vector>
 
 #include "llama.h"
@@ -18,6 +19,9 @@ public:
 
     std::string applyTemplate(const Model &model, bool addAssistant = true) const;
 
+    void setTemplateKwargs(const std::map<std::string, std::string> &kwargs);
+    const std::map<std::string, std::string> &templateKwargs() const;
+
     size_t messageCount() const;
 
     void trimToFit(const Model &model, int maxPromptTokens);
@@ -32,4 +36,5 @@ private:
 
     std::vector<Message> m_messages;
     std::string m_systemPrompt;
+    std::map<std::string, std::string> m_templateKwargs;
 };
