@@ -16,6 +16,7 @@
 #include "core/Agent.h"
 #include "core/ToolRegistry.h"
 #include "core/Config.h"
+#include "core/JsonHelper.h"
 #include "tools/FileTool.h"
 #include "tools/WebFetchTool.h"
 #include "tools/WebSearchTool.h"
@@ -40,6 +41,8 @@ static void printHelp(const char *argv0)
         << "  -n, --max-tokens N     Max tokens to generate (default: 4096)\n"
         << "  -s, --system TEXT      System prompt\n"
         << "  -ngl, --gpu-layers N   GPU layers (default: 99)\n"
+        << "  --reasoning-effort V   Chat template reasoning effort (Qwen3: xhigh|medium|low)\n"
+        << "  --template-kwarg K=V   Pass arbitrary chat template kwarg (repeatable)\n"
 
         << "  -l, --list             List models in models/\n"
         << "  -h, --help             Show this help\n"
@@ -93,6 +96,7 @@ int main(int argc, char **argv)
     std::string systemPrompt;
     bool listOnly = false;
     std::string configPath;
+    std::map<std::string, std::string> templateKwargs;
 
     auto usage = [&]() { printHelp(argv[0]); };
 
@@ -129,6 +133,7 @@ int main(int argc, char **argv)
         sparams.maxTokens = config.sampler.maxTokens;
         sparams.seed = config.sampler.seed;
         systemPrompt = config.systemPrompt;
+        templateKwargs = config.templateKwargs;
     }
 
     for (int i = 1; i < argc; ++i) {
@@ -157,6 +162,30 @@ int main(int argc, char **argv)
         else if (arg == "-ngl" || arg == "--gpu-layers") {
             try { mparams.gpuLayers = std::stoi(next()); }
             catch (...) { std::cerr << "Error: " << arg << " expects an integer\n"; return 1; }
+        }
+        else if (arg == "--reasoning-effort") {
+            std::string v = next();
+            std::string lower = v;
+            for (auto &c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            if (lower != "low" && lower != "medium" && lower != "xhigh") {
+                std::cerr << "Error: --reasoning-effort expects low|medium|xhigh (got '" << v << "')\n";
+                return 1;
+            }
+            templateKwargs["reasoning_effort"] = "\"" + lower + "\"";
+        }
+        else if (arg == "--template-kwarg") {
+            std::string kv = next();
+            size_t eq = kv.find('=');
+            if (eq == std::string::npos || eq == 0) {
+                std::cerr << "Error: --template-kwarg expects KEY=VALUE\n";
+                return 1;
+            }
+            std::string key = kv.substr(0, eq);
+            if (key.empty()) {
+                std::cerr << "Error: --template-kwarg key is empty\n";
+                return 1;
+            }
+            templateKwargs[key] = json_helper::toJsonLiteral(kv.substr(eq + 1));
         }
         else if (arg == "-l" || arg == "--list")    listOnly = true;
         else if (arg == "-h" || arg == "--help")    { usage(); Agent::shutdown(); return 0; }
@@ -209,6 +238,7 @@ int main(int argc, char **argv)
     Agent agent;
     agent.setSamplerParams(sparams);
     agent.setToolRegistry(&toolRegistry);
+    agent.setTemplateKwargs(templateKwargs);
     if (!systemPrompt.empty())
         agent.history().setSystemPrompt(systemPrompt);
 
@@ -273,6 +303,11 @@ int main(int argc, char **argv)
                         << "Ctx Size:        " << mparams.contextSize << "\n"
                         << "Thinking:        " << (agent.thinkingEnabled() ? "on" : "off") << "\n"
                         << "System Prompt:   " << agent.history().systemPrompt() << "\n";
+                auto kw = agent.templateKwargs();
+                std::cout << "Template Kwargs: " << (kw.empty() ? std::string("(none)") : std::string());
+                for (const auto &kv : kw)
+                    std::cout << kv.first << "=" << kv.second << "  ";
+                std::cout << "\n";
             } else if (cmd == "temp" || cmd.rfind("temp ", 0) == 0) {
                 auto sp = agent.samplerParams();
                 std::string val = cmd.size() > 5 ? cmd.substr(5) : "";
