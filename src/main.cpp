@@ -441,6 +441,7 @@ int main(int argc, char **argv)
     }
 
     std::cout << "\nGoodbye!\n";
+    agent.unloadModel();
     Agent::shutdown();
     return 0;
 }
