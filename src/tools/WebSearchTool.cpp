@@ -22,6 +22,7 @@ static std::string httpGetSearch(const std::string &url, int timeoutSec)
     urlComp.dwSchemeLength = (DWORD)-1;
     urlComp.dwHostNameLength = (DWORD)-1;
     urlComp.dwUrlPathLength = (DWORD)-1;
+    urlComp.dwExtraInfoLength = (DWORD)-1;
 
     std::wstring wurl(url.begin(), url.end());
     if (!WinHttpCrackUrl(wurl.c_str(), 0, 0, &urlComp)) {
@@ -30,6 +31,8 @@ static std::string httpGetSearch(const std::string &url, int timeoutSec)
 
     std::wstring host(urlComp.lpszHostName, urlComp.dwHostNameLength);
     std::wstring path(urlComp.lpszUrlPath, urlComp.dwUrlPathLength);
+    if (urlComp.lpszExtraInfo && urlComp.dwExtraInfoLength > 0)
+        path.append(urlComp.lpszExtraInfo, urlComp.dwExtraInfoLength);
     std::wstring scheme(urlComp.lpszScheme, urlComp.dwSchemeLength);
     bool isSecure = (scheme == L"https");
 
@@ -60,6 +63,9 @@ static std::string httpGetSearch(const std::string &url, int timeoutSec)
 
     DWORD decompressFlag = WINHTTP_DECOMPRESSION_FLAG_ALL;
     WinHttpSetOption(hRequest, WINHTTP_OPTION_DECOMPRESSION, &decompressFlag, sizeof(decompressFlag));
+
+    DWORD redirectPolicy = WINHTTP_OPTION_REDIRECT_POLICY_ALWAYS;
+    WinHttpSetOption(hRequest, WINHTTP_OPTION_REDIRECT_POLICY, &redirectPolicy, sizeof(redirectPolicy));
 
     if (!WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
                             WINHTTP_NO_REQUEST_DATA, 0, 0, 0)) {
