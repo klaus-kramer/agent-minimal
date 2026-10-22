@@ -98,7 +98,7 @@ inline std::string extractStringValue(const std::string &s, const std::string &k
         }
         size_t valEnd = findStringEnd(s, valStart);
         if (valEnd == std::string::npos) return {};
-        return s.substr(valStart + 1, valEnd - valStart - 2);
+        return unescapeJsonString(s.substr(valStart + 1, valEnd - valStart - 2));
     }
 }
 
@@ -178,7 +178,7 @@ inline std::string extractGemmaStringValue(const std::string &obj, const std::st
             if (obj[valStart] == '"') {
                 size_t valEnd = findStringEnd(obj, valStart);
                 if (valEnd == std::string::npos) return {};
-                return obj.substr(valStart + 1, valEnd - valStart - 2);
+                return unescapeJsonString(obj.substr(valStart + 1, valEnd - valStart - 2));
             } else {
                 size_t valEnd = valStart + 1;
                 while (valEnd < obj.size() && obj[valEnd] != '\'')
@@ -251,6 +251,23 @@ inline std::string extractToolArg(const std::string &rawArgs, const std::string 
         val = extractStringValue(args, key);
         if (!val.empty()) return val;
         val = extractGemmaStringValue(args, key);
+        if (!val.empty()) return val;
+    }
+
+    // Fall back to raw JSON values so numbers and booleans (e.g. max_results,
+    // timeout, replace_all) are not silently ignored.
+    auto rawArg = [&](const std::string &src) -> std::string {
+        std::string raw = extractRawValue(src, key);
+        if (raw.empty()) return {};
+        if (raw.size() >= 2 && raw.front() == '"' && raw.back() == '"')
+            return unescapeJsonString(raw.substr(1, raw.size() - 2));
+        return raw;
+    };
+
+    val = rawArg(rawArgs);
+    if (!val.empty()) return val;
+    if (!args.empty()) {
+        val = rawArg(args);
         if (!val.empty()) return val;
     }
 

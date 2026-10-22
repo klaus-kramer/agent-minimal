@@ -245,6 +245,14 @@ void Agent::runChat(const std::string &userMessage,
     m_bypassTemplate = false;
     m_toolContextSuffix.clear();
     m_toolSteps.clear();
+
+    std::string savedSystem = m_history.systemPrompt();
+    struct SystemPromptRestore {
+        ChatHistory &history;
+        const std::string &saved;
+        ~SystemPromptRestore() { history.setSystemPrompt(saved); }
+    } systemPromptRestore{m_history, savedSystem};
+
     try {
         m_history.addMessage("user", userMessage);
 
@@ -259,7 +267,6 @@ void Agent::runChat(const std::string &userMessage,
             m_sampler.init(m_model.vocab(), m_samplerParams);
 
         bool toolsActive = m_toolRegistry && !m_toolRegistry->isEmpty();
-        std::string savedSystem = m_history.systemPrompt();
         const ToolTurnMarkers markers = toolTurnMarkersFor(m_model.name());
         int toolIter = 0;
         const int MAX_TOOL_ITERS = 5;
@@ -573,11 +580,13 @@ void Agent::runChat(const std::string &userMessage,
                                     size_t closeBrace = json_helper::findValueEnd(remaining, openBrace);
                                     if (closeBrace != std::string::npos) {
                                         remaining = remaining.substr(0, pos) + remaining.substr(closeBrace);
+                                        removed = true;
                                     }
                                 }
                             }
                         }
                         if (!removed) break;
+                        continue;
                     }
 
                     if (call.name == "thought") {
@@ -642,8 +651,8 @@ void Agent::runChat(const std::string &userMessage,
                     } else {
                         toolResultStr += markers.modelOpen;
                         if (isQwenFamily())
-                            toolResultStr += m_thinkingEnabled ? "thinking\n"
-                                                               : " thinking\n\n response\n\n";
+                            toolResultStr += m_thinkingEnabled ? "<think>\n"
+                                                               : "<think>\n\n</think>\n\n";
                     }
                     m_toolContextSuffix += toolResultStr;
                     m_bypassTemplate = true;

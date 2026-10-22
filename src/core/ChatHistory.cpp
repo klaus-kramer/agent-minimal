@@ -190,7 +190,7 @@ std::string ChatHistory::applyTemplate(const Model &model, bool addAssistant) co
     if (len <= 0)
         return {};
 
-    std::string result(static_cast<size_t>(len) - 1, '\0');
+    std::string result(static_cast<size_t>(len), '\0');
     llama_chat_apply_template(
         tmpl.c_str(), chat.data(), chat.size(), addAssistant, result.data(), len);
 
@@ -221,6 +221,6 @@ void ChatHistory::trimToFit(const Model &model, int maxPromptTokens)
             break;
         }
 
-        m_messages.erase(m_messages.begin() + 1);
+        m_messages.erase(m_messages.begin());
     }
 }
