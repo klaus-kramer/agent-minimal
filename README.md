@@ -92,6 +92,6 @@ Other models may work but are used without guarantees – template detection heu
 v0.3.0: new CLI-parameter --reasoning-effort and --template-kwarg    
 
 ## links:    
-my new ai Grimmelshausen https://huggingface.co/Klaus-Kramer/Grimmelshausen    
-my tool Vigil-Fluminis for Windows-security https://github.com/klaus-kramer/Vigil-Fluminis    
+ai Grimmelshausen https://huggingface.co/Klaus-Kramer/Grimmelshausen    
+tool Vigil-Fluminis for Windows-security https://github.com/klaus-kramer/Vigil-Fluminis    
 
