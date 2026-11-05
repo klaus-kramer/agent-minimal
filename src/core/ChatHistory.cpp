@@ -151,7 +151,7 @@ static std::string applyTemplateWithKwargs(
         inputs.use_jinja = true;
         inputs.chat_template_kwargs = kwargs;
 
-        return common_chat_templates_apply(tmpls.get(), inputs).prompt;
+        return common_chat_templates_apply(tmpls.get(), inputs).prompt.str();
     } catch (...) {
         return {};
     }

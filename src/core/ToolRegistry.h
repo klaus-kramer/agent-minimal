@@ -9,6 +9,9 @@ class ToolRegistry {
 public:
     void registerTool(const ToolDefinition& def, ToolExecuteFn fn);
 
+    void setContext(const std::string& context) { m_context = context; }
+    const std::string& context() const { return m_context; }
+
     std::string generateToolPrompt() const;
     ToolCall parseToolCall(const std::string& response);
 
@@ -26,4 +29,5 @@ private:
     };
 
     std::vector<RegisteredTool> m_tools;
+    std::string m_context;
 };

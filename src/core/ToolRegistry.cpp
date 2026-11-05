@@ -18,9 +18,12 @@ std::string ToolRegistry::generateToolPrompt() const
           "Call format: {\"function\": \"name\", \"arguments\": {params}}\n"
           "Example: {\"function\": \"read_file\", \"arguments\": {\"path\": \"foo.txt\"}}\n\n"
 
-          "Reply naturally for normal conversation, without any function call.\n\n"
+          "Reply naturally for normal conversation, without any function call.\n\n";
 
-          "### Available functions\n\n";
+    if (!m_context.empty())
+        os << m_context << "\n\n";
+
+    os << "### Available functions\n\n";
 
     for (const auto& rt : m_tools) {
         os << "**" << rt.def.name << "**\n";
