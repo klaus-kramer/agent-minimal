@@ -195,6 +195,36 @@ static ToolResult writeFileTool(const ToolCall& call)
     return {true, os.str()};
 }
 
+static bool hasToolArg(const std::string &rawArgs, const std::string &key)
+{
+    const std::string quotedKey = "\"" + key + "\"";
+    size_t pos = 0;
+    while ((pos = rawArgs.find(quotedKey, pos)) != std::string::npos) {
+        size_t after = json_helper::skipWhitespace(rawArgs, pos + quotedKey.size());
+        if (after < rawArgs.size() && rawArgs[after] == ':')
+            return true;
+        pos += quotedKey.size();
+    }
+
+    const std::string gemmaKey = key + ":";
+    pos = 0;
+    while ((pos = rawArgs.find(gemmaKey, pos)) != std::string::npos) {
+        bool identifierChar = pos > 0 &&
+            (std::isalnum(static_cast<unsigned char>(rawArgs[pos - 1])) || rawArgs[pos - 1] == '_');
+        if (!identifierChar)
+            return true;
+        pos += gemmaKey.size();
+    }
+
+    std::string nested = json_helper::extractObjectValue(rawArgs, "arguments");
+    if (nested.empty())
+        nested = json_helper::extractObjectValue(rawArgs, "parameters");
+    if (!nested.empty() && nested != rawArgs)
+        return hasToolArg(nested, key);
+
+    return false;
+}
+
 static ToolResult editFileTool(const ToolCall& call)
 {
     std::string path      = json_helper::extractToolArg(call.rawArguments, "path");
@@ -205,6 +235,10 @@ static ToolResult editFileTool(const ToolCall& call)
 
     if (path.empty())      return {false, "Missing parameter: path"};
     if (oldString.empty()) return {false, "Missing parameter: old_string"};
+    // An explicitly empty new_string is valid (it deletes old_string), so
+    // distinguish it from a key that was not supplied at all.
+    if (!hasToolArg(call.rawArguments, "new_string"))
+        return {false, "Missing parameter: new_string"};
 
     fs::path fp;
     try {
