@@ -19,7 +19,12 @@ static fs::path &getAllowedRoot()
 
 void setAllowedRoot(const std::string &path)
 {
-    getAllowedRoot() = fs::absolute(path);
+    getAllowedRoot() = fs::absolute(path).lexically_normal();
+}
+
+std::string getAllowedRootPath()
+{
+    return getAllowedRoot().string();
 }
 
 static bool isAllowedPath(const fs::path &resolved, const fs::path &root, std::string &error)
@@ -45,35 +50,72 @@ static bool isAllowedPath(const fs::path &resolved, const fs::path &root, std::s
     return true;
 }
 
-bool isPathAllowed(const std::string &path, std::string &error)
+bool resolvePathInRoot(const std::string &path, std::string &resolvedOut, std::string &error)
 {
     try {
-        fs::path resolved = fs::absolute(path).lexically_normal();
-        return isAllowedPath(resolved, getAllowedRoot(), error);
+        fs::path p(path.empty() ? "." : path);
+        std::string pStr = p.string();
+
+#ifdef _WIN32
+        if (pStr.size() == 2 && std::isalpha(static_cast<unsigned char>(pStr[0])) && pStr[1] == ':') {
+            pStr += '\\';
+            p = fs::path(pStr);
+        }
+
+        bool driveQualified = pStr.size() >= 2 &&
+            std::isalpha(static_cast<unsigned char>(pStr[0])) && pStr[1] == ':';
+        bool uncPath = pStr.size() >= 2 &&
+            (pStr[0] == '/' || pStr[0] == '\\') &&
+            (pStr[1] == '/' || pStr[1] == '\\');
+
+        if (driveQualified && !p.is_absolute()) {
+            std::string rest = pStr.substr(2);
+            while (!rest.empty() && (rest[0] == '/' || rest[0] == '\\'))
+                rest = rest.substr(1);
+            p = fs::path(pStr.substr(0, 2) + "\\" + rest);
+        }
+
+        // Models often emit Unix-style paths such as "/src/main.cpp" for
+        // project files. On Windows those would resolve to the current drive
+        // root, so treat them as project-relative instead.
+        if (!driveQualified && !uncPath && !pStr.empty() &&
+            (pStr[0] == '/' || pStr[0] == '\\')) {
+            size_t pos = 0;
+            while (pos < pStr.size() && (pStr[pos] == '/' || pStr[pos] == '\\'))
+                ++pos;
+            p = getAllowedRoot() / pStr.substr(pos);
+        } else
+#endif
+        if (!p.is_absolute()) {
+            p = getAllowedRoot() / p;
+        }
+
+        fs::path resolved = fs::absolute(p).lexically_normal();
+        if (!isAllowedPath(resolved, getAllowedRoot(), error))
+            return false;
+
+        resolvedOut = resolved.string();
+        return true;
     } catch (const std::exception &e) {
         error = e.what();
         return false;
     }
 }
 
+bool isPathAllowed(const std::string &path, std::string &error)
+{
+    std::string resolved;
+    return resolvePathInRoot(path, resolved, error);
+}
+
 static fs::path resolveAndCheck(const fs::path& p)
 {
-#ifdef _WIN32
-
-    std::string pStr = p.string();
-    if (pStr.size() == 2 && std::isalpha(static_cast<unsigned char>(pStr[0])) && pStr[1] == ':') {
-        pStr += '\\';
-        return resolveAndCheck(fs::path(pStr));
-    }
-#endif
-
-    fs::path resolved = fs::absolute(p).lexically_normal();
-
+    std::string resolved;
     std::string error;
-    if (!isAllowedPath(resolved, getAllowedRoot(), error))
+    if (!resolvePathInRoot(p.string(), resolved, error))
         throw std::runtime_error(error);
 
-    return resolved;
+    return fs::path(resolved);
 }
 
 static ToolResult readFileTool(const ToolCall& call)

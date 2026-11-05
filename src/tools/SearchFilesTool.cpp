@@ -1,5 +1,6 @@
 ﻿#include "SearchFilesTool.h"
 #include "FileTool.h"
+#include "GlobHelper.h"
 #include "core/JsonHelper.h"
 
 #include <regex>
@@ -12,33 +13,6 @@ namespace fs = std::filesystem;
 
 static constexpr int MAX_FILES_DEFAULT = 50;
 static constexpr int MAX_FILES_LIMIT = 500;
-
-static std::string globToRegex(const std::string &glob)
-{
-    std::string re;
-    re.reserve(glob.size() + 4);
-    for (size_t i = 0; i < glob.size(); ++i) {
-        char c = glob[i];
-        switch (c) {
-            case '*': re += ".*";  break;
-            case '?': re += ".";   break;
-            case '.': re += "\\."; break;
-            case '+': re += "\\+"; break;
-            case '(': re += "\\("; break;
-            case ')': re += "\\)"; break;
-            case '[': re += "[";   break;
-            case ']': re += "]";   break;
-            case '{': re += "\\{"; break;
-            case '}': re += "\\}"; break;
-            case '^': re += "\\^"; break;
-            case '$': re += "\\$"; break;
-            case '|': re += "\\|"; break;
-            case '\\': re += "\\\\"; break;
-            default:  re += c;     break;
-        }
-    }
-    return re;
-}
 
 static ToolResult searchFilesTool(const ToolCall &call)
 {
@@ -63,11 +37,12 @@ static ToolResult searchFilesTool(const ToolCall &call)
         } catch (...) {}
     }
 
+    std::string rootStr;
     std::string accessError;
-    if (!isPathAllowed(searchPath, accessError))
+    if (!resolvePathInRoot(searchPath, rootStr, accessError))
         return {false, accessError};
 
-    fs::path root = fs::absolute(searchPath).lexically_normal();
+    fs::path root = fs::path(rootStr);
     if (!fs::exists(root))
         return {false, "Path not found: " + searchPath};
     if (!fs::is_directory(root))
@@ -75,7 +50,7 @@ static ToolResult searchFilesTool(const ToolCall &call)
 
     std::regex re;
     try {
-        re = std::regex(globToRegex(glob), std::regex::icase);
+        re = std::regex(glob_helper::globToRegex(glob), std::regex::icase);
     } catch (const std::regex_error &e) {
         return {false, "Invalid glob pattern: " + std::string(e.what())};
     }

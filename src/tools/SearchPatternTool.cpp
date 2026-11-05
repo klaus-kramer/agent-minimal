@@ -1,5 +1,6 @@
 ﻿#include "SearchPatternTool.h"
 #include "FileTool.h"
+#include "GlobHelper.h"
 #include "core/JsonHelper.h"
 
 #include <regex>
@@ -16,33 +17,6 @@ static constexpr size_t MAX_SEARCH_FILE_SIZE = 524288;
 static constexpr int MAX_RESULTS_PER_FILE = 100;
 static constexpr int MAX_TOTAL_MATCHES = 30;
 static constexpr size_t MAX_LINE_LENGTH = 4096;
-
-static std::string globToRegex(const std::string &glob)
-{
-    std::string re;
-    re.reserve(glob.size() + 4);
-    for (size_t i = 0; i < glob.size(); ++i) {
-        char c = glob[i];
-        switch (c) {
-            case '*': re += ".*";  break;
-            case '?': re += ".";   break;
-            case '.': re += "\\."; break;
-            case '+': re += "\\+"; break;
-            case '(': re += "\\("; break;
-            case ')': re += "\\)"; break;
-            case '[': re += "[";   break;
-            case ']': re += "]";   break;
-            case '{': re += "\\{"; break;
-            case '}': re += "\\}"; break;
-            case '^': re += "\\^"; break;
-            case '$': re += "\\$"; break;
-            case '|': re += "\\|"; break;
-            case '\\': re += "\\\\"; break;
-            default:  re += c;     break;
-        }
-    }
-    return re;
-}
 
 static bool matchesFilter(const fs::path &filePath, const std::regex *filterRe)
 {
@@ -63,11 +37,12 @@ static ToolResult searchPatternTool(const ToolCall &call)
     if (searchPath.empty())
         searchPath = ".";
 
+    std::string rootStr;
     std::string accessError;
-    if (!isPathAllowed(searchPath, accessError))
+    if (!resolvePathInRoot(searchPath, rootStr, accessError))
         return {false, accessError};
 
-    fs::path root = fs::absolute(searchPath).lexically_normal();
+    fs::path root = fs::path(rootStr);
     if (!fs::exists(root))
         return {false, "Path not found: " + searchPath};
     if (!fs::is_directory(root))
@@ -83,7 +58,7 @@ static ToolResult searchPatternTool(const ToolCall &call)
     std::optional<std::regex> filterRe;
     if (!includeFilter.empty()) {
         try {
-            filterRe.emplace(globToRegex(includeFilter), std::regex::icase);
+            filterRe.emplace(glob_helper::globToRegex(includeFilter), std::regex::icase);
         } catch (const std::regex_error &e) {
             return {false, "Invalid include pattern: " + std::string(e.what())};
         }
