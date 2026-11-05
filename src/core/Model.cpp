@@ -48,9 +48,11 @@ bool Model::load(const std::string &path, const Params &params)
     llama_context_params cp = llama_context_default_params();
     cp.n_ctx    = params.contextSize;
     cp.n_batch  = params.batchSize;
-    cp.n_threads = params.threads > 0
-                       ? params.threads
-                       : static_cast<int>(std::thread::hardware_concurrency());
+    const int nThreads = params.threads > 0
+                             ? params.threads
+                             : static_cast<int>(std::thread::hardware_concurrency());
+    cp.n_threads       = nThreads;
+    cp.n_threads_batch = nThreads;
 
     m_ctx = llama_init_from_model(m_model, cp);
     if (!m_ctx) {

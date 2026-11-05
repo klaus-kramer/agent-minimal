@@ -81,7 +81,8 @@ private:
     Sampler      m_sampler;
     Sampler::Params m_samplerParams;
     ChatHistory  m_history;
-    bool         m_running = false;
+    std::vector<llama_token> m_cachedTokens;
+    std::atomic<bool> m_running{false};
     bool         m_thinkingEnabled = true;
     std::string  m_lastError;
     ToolRegistry *m_toolRegistry = nullptr;

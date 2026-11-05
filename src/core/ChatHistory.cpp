@@ -204,14 +204,21 @@ size_t ChatHistory::messageCount() const
 
 void ChatHistory::trimToFit(const Model &model, int maxPromptTokens)
 {
+    if (maxPromptTokens < 0)
+        maxPromptTokens = 0;
+
+    const auto *vocab = model.vocab();
+    // llama_tokenize only reports a non-negative count when a real output
+    // buffer is supplied; with nullptr it always returns -n_tokens.
+    std::vector<llama_token> tokens(static_cast<size_t>(maxPromptTokens) + 1);
+
     while (!m_messages.empty()) {
         std::string prompt = applyTemplate(model, true);
         if (prompt.empty()) break;
 
-        const auto *vocab = model.vocab();
         int n = llama_tokenize(vocab,
             prompt.c_str(), static_cast<int>(prompt.size()),
-            nullptr, 0, true, true);
+            tokens.data(), static_cast<int>(tokens.size()), true, true);
 
         if (n >= 0 && n <= maxPromptTokens)
             break;

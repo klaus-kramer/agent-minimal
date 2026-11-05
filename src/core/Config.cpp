@@ -45,9 +45,7 @@ std::string trimValue(const std::string& s) {
     return s.substr(a, b - a);
 }
 
-// Parses a flat JSON object into key -> raw JSON value pairs. Values are kept
-// verbatim so their JSON type (string/number/bool/object) is preserved for
-// common_chat_templates_apply.
+
 std::map<std::string, std::string> parseStringMap(const std::string& obj) {
     std::map<std::string, std::string> out;
     size_t pos = json_helper::skipWhitespace(obj, 0);

@@ -18,6 +18,8 @@ static int s_llamaRefCount = 0;
 
 static constexpr size_t MAX_TOOL_RESULT_CHARS = 16384;
 
+static constexpr size_t CHANNEL_MARKER_TAIL = 9;
+
 namespace {
 
 struct ToolTurnMarkers {
@@ -100,6 +102,7 @@ void Agent::unloadModel()
 {
     m_sampler.free();
     m_history.clear();
+    m_cachedTokens.clear();
     m_model.unload();
 }
 
@@ -358,26 +361,64 @@ void Agent::runChat(const std::string &userMessage,
             }
 
             if (nTokens <= 0) {
-                if (onError) onError(m_lastError = "Tokenization failed");
                 m_running = false;
+                if (onError) onError(m_lastError = "Tokenization failed");
                 return;
             }
             tokens.resize(nTokens);
             m_lastTokenCount = nTokens;
 
-            llama_memory_clear(llama_get_memory(ctx), true);
+
+            if (maxTokens <= 0) {
+                m_running = false;
+                if (onError) onError(m_lastError = "Invalid max tokens setting");
+                return;
+            }
+            int maxGen = ctxSize - nTokens;
+            if (maxGen > maxTokens)
+                maxGen = maxTokens;
+            if (maxGen <= 0) {
+                m_running = false;
+                if (onError) onError(m_lastError = "No space left in context for generation");
+                return;
+            }
+
+
+            llama_memory_t mem = llama_get_memory(ctx);
+
+            size_t nCommon = 0;
+            const size_t maxCommon = std::min(m_cachedTokens.size(), tokens.size());
+            while (nCommon < maxCommon && m_cachedTokens[nCommon] == tokens[nCommon])
+                ++nCommon;
+
+
+            if (nCommon > 0 && nCommon == tokens.size() && nCommon < m_cachedTokens.size())
+                --nCommon;
+
+            if (nCommon == 0) {
+                llama_memory_clear(mem, true);
+            } else if (nCommon < m_cachedTokens.size()) {
+                if (!llama_memory_seq_rm(mem, 0, static_cast<llama_pos>(nCommon), -1)) {
+
+                    llama_memory_clear(mem, true);
+                    nCommon = 0;
+                }
+            }
+            m_cachedTokens.resize(nCommon);
 
             int batchSize = m_model.batchSize();
-            for (int i = 0; i < nTokens; i += batchSize) {
+            for (int i = static_cast<int>(nCommon); i < nTokens; i += batchSize) {
                 int nBatch = std::min(batchSize, nTokens - i);
                 llama_batch batch = llama_batch_get_one(
                     tokens.data() + i, nBatch);
                 if (llama_decode(ctx, batch) != 0) {
-                    if (onError) onError(m_lastError = "Prompt decode failed");
+                    m_cachedTokens.clear();
                     m_running = false;
+                    if (onError) onError(m_lastError = "Prompt decode failed");
                     return;
                 }
             }
+            m_cachedTokens.assign(tokens.begin(), tokens.end());
 
             std::string modelName = m_model.name();
             for (auto &c : modelName)
@@ -394,7 +435,7 @@ void Agent::runChat(const std::string &userMessage,
             int toolJsonDepth = 0;
             size_t toolScanPos = 0;
 
-            while (generated < maxTokens && !m_cancelled) {
+            while (generated < maxGen && !m_cancelled) {
                 llama_token token = m_sampler.sample(ctx, -1);
 
                 if (llama_vocab_is_eog(vocab, token))
@@ -402,7 +443,7 @@ void Agent::runChat(const std::string &userMessage,
 
                 m_sampler.accept(token);
 
-                char buf[16];
+                char buf[256];
                 int n = llama_token_to_piece(vocab, token, buf, sizeof(buf), 0, true);
                 if (n > 0) {
                     std::string piece(buf, static_cast<size_t>(n));
@@ -423,32 +464,30 @@ void Agent::runChat(const std::string &userMessage,
                                 goto piece_handled;
                             }
                         }
-                        if (!suppressStream) {
+                        if (!suppressStream && response.size() + piece.size() < 300) {
                             std::string check = response + piece;
-                            if (check.size() < 300) {
-                                auto fpos = check.find("\"function\":", toolScanPos);
-                                if (fpos != std::string::npos && fpos < 300) {
-                                    auto bracePos = check.rfind('{', fpos);
-                                    if (bracePos != std::string::npos && bracePos >= toolScanPos && check.size() - bracePos < 150) {
-                                        suppressStream = true;
-                                        toolJsonDepth = 0;
-                                        for (size_t i = bracePos; i < response.size(); ++i)
-                                            if (response[i] == '{') ++toolJsonDepth;
-                                            else if (response[i] == '}') --toolJsonDepth;
-                                        if (onToken) onToken("\n[Calling tool...]\n");
-                                    }
+                            auto fpos = check.find("\"function\":", toolScanPos);
+                            if (fpos != std::string::npos && fpos < 300) {
+                                auto bracePos = check.rfind('{', fpos);
+                                if (bracePos != std::string::npos && bracePos >= toolScanPos && check.size() - bracePos < 150) {
+                                    suppressStream = true;
+                                    toolJsonDepth = 0;
+                                    for (size_t i = bracePos; i < response.size(); ++i)
+                                        if (response[i] == '{') ++toolJsonDepth;
+                                        else if (response[i] == '}') --toolJsonDepth;
+                                    if (onToken) onToken("\n[Calling tool...]\n");
                                 }
-                                auto gemmaPos = check.find("call:", toolScanPos);
-                                if (!suppressStream && gemmaPos != std::string::npos && gemmaPos < 300) {
-                                    auto bracePos = check.find('{', gemmaPos);
-                                    if (bracePos != std::string::npos && bracePos >= toolScanPos && bracePos - gemmaPos < 80) {
-                                        suppressStream = true;
-                                        toolJsonDepth = 0;
-                                        for (size_t i = bracePos; i < response.size(); ++i)
-                                            if (response[i] == '{') ++toolJsonDepth;
-                                            else if (response[i] == '}') --toolJsonDepth;
-                                        if (onToken) onToken("\n[Calling tool...]\n");
-                                    }
+                            }
+                            auto gemmaPos = check.find("call:", toolScanPos);
+                            if (!suppressStream && gemmaPos != std::string::npos && gemmaPos < 300) {
+                                auto bracePos = check.find('{', gemmaPos);
+                                if (bracePos != std::string::npos && bracePos >= toolScanPos && bracePos - gemmaPos < 80) {
+                                    suppressStream = true;
+                                    toolJsonDepth = 0;
+                                    for (size_t i = bracePos; i < response.size(); ++i)
+                                        if (response[i] == '{') ++toolJsonDepth;
+                                        else if (response[i] == '}') --toolJsonDepth;
+                                    if (onToken) onToken("\n[Calling tool...]\n");
                                 }
                             }
                         }
@@ -471,19 +510,24 @@ void Agent::runChat(const std::string &userMessage,
                         discardBuf += piece;
                         auto markerPos = discardBuf.find("<channel|");
                         if (markerPos != std::string::npos) {
-                            discardBuf = discardBuf.substr(markerPos + 9);
-                            if (!discardBuf.empty() && discardBuf[0] == '>')
-                                discardBuf = discardBuf.substr(1);
-                            if (!discardBuf.empty()) {
-                                response += discardBuf;
-                                if (onToken) onToken(discardBuf);
-                            }
+                            std::string rest = discardBuf.substr(markerPos + 9);
+                            if (!rest.empty() && rest[0] == '>')
+                                rest = rest.substr(1);
                             discardBuf.clear();
                             pState = STREAMING;
-                        } else if (discardBuf.find("<|channel>") == std::string::npos) {
-                            if (discardBuf.size() > 128) {
+                            if (!rest.empty()) {
+                                response += rest;
+                                if (onToken) onToken(rest);
+                            }
+                        } else {
+                            auto openPos = discardBuf.find("<|channel>");
+                            if (openPos != std::string::npos) {
+
+                                discardBuf.clear();
+                                pState = DISCARDING;
+                            } else if (discardBuf.size() > 128) {
                                 pState = STREAMING;
-                                response = discardBuf;
+                                response += discardBuf;
                                 if (onToken) onToken(discardBuf);
                                 discardBuf.clear();
                             }
@@ -501,6 +545,9 @@ void Agent::runChat(const std::string &userMessage,
                                 response += rest;
                                 if (onToken) onToken(rest);
                             }
+                        } else if (discardBuf.size() > CHANNEL_MARKER_TAIL) {
+
+                            discardBuf.erase(0, discardBuf.size() - CHANNEL_MARKER_TAIL);
                         }
                     }
                     piece_handled: ;
@@ -508,14 +555,34 @@ void Agent::runChat(const std::string &userMessage,
 
                 llama_batch batch = llama_batch_get_one(&token, 1);
                 if (llama_decode(ctx, batch) != 0) {
-                    break;
+                    m_cachedTokens.clear();
+                    m_running = false;
+                    if (onError) onError(m_lastError = "Generation decode failed");
+                    return;
                 }
 
+                m_cachedTokens.push_back(token);
                 ++generated;
             }
 
-            if (pState == SCANNING && discardBuf.find("<|channel>") == std::string::npos) {
-                response += discardBuf;
+            if (!discardBuf.empty()) {
+                if (pState == SCANNING) {
+
+                    response += discardBuf;
+                    if (onToken) onToken(discardBuf);
+                } else if (pState == DISCARDING) {
+
+                    size_t endPos = discardBuf.find("<channel|");
+                    if (endPos != std::string::npos) {
+                        std::string rest = discardBuf.substr(endPos + 9);
+                        if (!rest.empty() && rest[0] == '>')
+                            rest = rest.substr(1);
+                        if (!rest.empty()) {
+                            response += rest;
+                            if (onToken) onToken(rest);
+                        }
+                    }
+                }
             }
             discardBuf.clear();
 
@@ -523,6 +590,7 @@ void Agent::runChat(const std::string &userMessage,
 
             if (m_cancelled) {
                 m_running = false;
+                if (onError) onError(m_lastError = "Generation cancelled");
                 return;
             }
 
@@ -697,6 +765,7 @@ void Agent::runChat(const std::string &userMessage,
 
             if (m_cancelled) {
                 m_running = false;
+                if (onError) onError(m_lastError = "Generation cancelled");
                 return;
             }
 
@@ -719,16 +788,16 @@ void Agent::runChat(const std::string &userMessage,
             m_bypassTemplate = false;
             m_toolContextSuffix.clear();
 
+            m_running = false;
             if (onComplete) onComplete(response);
-            break;
+            return;
 
         } while (true);
 
     } catch (const std::exception &e) {
+        m_running = false;
         if (onError) onError(m_lastError = e.what());
     }
-
-    m_running = false;
 }
 
 void Agent::cancel()

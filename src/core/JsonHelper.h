@@ -254,8 +254,7 @@ inline std::string extractToolArg(const std::string &rawArgs, const std::string 
         if (!val.empty()) return val;
     }
 
-    // Fall back to raw JSON values so numbers and booleans (e.g. max_results,
-    // timeout, replace_all) are not silently ignored.
+
     auto rawArg = [&](const std::string &src) -> std::string {
         std::string raw = extractRawValue(src, key);
         if (raw.empty()) return {};
@@ -309,10 +308,7 @@ inline std::vector<std::string> extractStringArray(const std::string &s, const s
     return result;
 }
 
-// Converts a raw CLI/config value into a JSON literal placeholder that
-// common_chat_templates_apply (which runs json::parse on every kwarg value)
-// accepts: a bareword like "low" becomes the JSON string "low", while
-// "false", "42" or "{}" are passed through unchanged.
+
 inline std::string toJsonLiteral(const std::string &value)
 {
     size_t a = skipWhitespace(value, 0);
