@@ -235,6 +235,12 @@ int main(int argc, char **argv)
         registerSearchFilesTool(toolRegistry);
     }
 
+    toolRegistry.setContext(
+        "Project root: " + getAllowedRootPath() + "\n"
+        "All file paths passed to tools are resolved relative to this project root. "
+        "Paths starting with '/' or '\\' (for example \"/src/main.cpp\") are treated as "
+        "project-relative; do not prepend a drive letter or an absolute system path.");
+
     Agent agent;
     agent.setSamplerParams(sparams);
     agent.setToolRegistry(&toolRegistry);
