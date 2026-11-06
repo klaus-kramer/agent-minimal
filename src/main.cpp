@@ -1,4 +1,6 @@
-﻿#include <iostream>
+﻿// License: MIT - Copyright (c) 2026 Klaus Kramer
+
+#include <iostream>
 #include <string>
 #include <vector>
 #include <thread>
