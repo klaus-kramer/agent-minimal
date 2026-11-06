@@ -1,4 +1,4 @@
-# agent-minimal WIP (work in progress)
+# agent-minimal WIP (work in progress = not productionready)
 A minimal, embeddable C++ local AI agent built on llama.cpp. It demonstrates tool calling and a clean architecture without heavy dependencies.
 
 
