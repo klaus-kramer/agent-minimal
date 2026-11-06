@@ -7,7 +7,7 @@ A minimal, embeddable C++ local AI agent built on llama.cpp. It demonstrates too
 - Tool/function calling – Built-in file I/O, web fetch/search,  pattern search, command execution    
 - CUDA GPU acceleration – Automatic detection and enablement     
 - Interactive CLI – slash commands, parameter tuning, session management    
-
+v0.3.0: new CLI-parameter --reasoning-effort and --template-kwarg
 
 ## Key Points:
 - Embeddable C++ library - `libagent_core` can be linked into any C++ application via `#include <core/Agent.h>`    
@@ -90,8 +90,6 @@ qwen3.8 27b
 Other models may work but are used without guarantees – template detection heuristics may not cover all formats.    
 
 ## License: MIT - Copyright (c) 2026 Klaus Kramer
-
-v0.3.0: new CLI-parameter --reasoning-effort and --template-kwarg    
 
 ## links:    
 ai Grimmelshausen https://huggingface.co/Klaus-Kramer/Grimmelshausen    
