@@ -77,6 +77,10 @@ ToolCall ToolRegistry::parseToolCall(const std::string& raw)
         }
     }
 
+    auto xmlCall = json_helper::extractXmlToolCall(response);
+    if (!xmlCall.name.empty())
+        return {xmlCall.name, xmlCall.arguments};
+
     std::string name = json_helper::extractStringValue(response, "function");
     if (name.empty())
         name = json_helper::extractStringValue(response, "name");

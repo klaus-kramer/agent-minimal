@@ -44,6 +44,13 @@ ToolTurnMarkers toolTurnMarkersFor(const std::string &modelName)
         return { "<turn|>\n", "<|turn>tool\n", "<turn|>\n", "<|turn>model\n", true };
     }
 
+    const bool qwen = name.find("qwen") != std::string::npos;
+    if (qwen) {
+        // Qwen renders tool results as a user message with a tool_response block.
+        return { "\n<|im_end|>\n", "<|im_start|>user\n<tool_response>\n",
+                 "\n</tool_response><|im_end|>\n", "<|im_start|>assistant\n", false };
+    }
+
     return { "\n<|im_end|>\n", "<|im_start|>tool\n", "<|im_end|>\n", "<|im_start|>assistant\n", false };
 }
 
@@ -272,7 +279,7 @@ void Agent::runChat(const std::string &userMessage,
         bool toolsActive = m_toolRegistry && !m_toolRegistry->isEmpty();
         const ToolTurnMarkers markers = toolTurnMarkersFor(m_model.name());
         int toolIter = 0;
-        const int MAX_TOOL_ITERS = 5;
+        const int MAX_TOOL_ITERS = 32;
 
         do {
             if (toolsActive) {
@@ -615,10 +622,54 @@ void Agent::runChat(const std::string &userMessage,
             };
             stripMarkers(response);
 
+            if (toolsActive && toolIter >= MAX_TOOL_ITERS) {
+                ToolCall pending = m_toolRegistry->parseToolCall(response);
+                if (!pending.name.empty() && m_toolRegistry->findTool(pending.name))
+                    std::cerr << "\n[Tool call limit (" << MAX_TOOL_ITERS
+                              << ") reached - ending turn]\n";
+            }
+
             bool toolCalled = false;
             if (toolsActive && toolIter < MAX_TOOL_ITERS) {
                 std::string remaining = response;
                 std::unordered_set<std::string> seenCalls;
+
+                auto removeCallText = [](std::string &text, const ToolCall &call) -> bool {
+                    auto xml = json_helper::extractXmlToolCall(text);
+                    if (!xml.name.empty() && xml.name == call.name) {
+                        text.erase(xml.begin, xml.end - xml.begin);
+                        return true;
+                    }
+
+                    std::string jsonKey = "\"function\": \"" + call.name + "\"";
+                    size_t pos = text.find(jsonKey);
+                    if (pos != std::string::npos) {
+                        size_t openBrace = text.rfind('{', pos);
+                        if (openBrace != std::string::npos) {
+                            size_t closeBrace = json_helper::findValueEnd(text, openBrace);
+                            if (closeBrace != std::string::npos) {
+                                text = text.substr(0, openBrace) + text.substr(closeBrace);
+                                return true;
+                            }
+                        }
+                    }
+
+                    std::string gemmaKey = "call:" + call.name;
+                    pos = text.find(gemmaKey);
+                    if (pos != std::string::npos) {
+                        size_t openBrace = text.find('{', pos);
+                        if (openBrace != std::string::npos) {
+                            size_t closeBrace = json_helper::findValueEnd(text, openBrace);
+                            if (closeBrace != std::string::npos) {
+                                text = text.substr(0, pos) + text.substr(closeBrace);
+                                return true;
+                            }
+                        }
+                    }
+
+                    return false;
+                };
+
                 while (toolIter < MAX_TOOL_ITERS) {
                     ToolCall call = m_toolRegistry->parseToolCall(remaining);
                     if (call.name.empty()) break;
@@ -626,52 +677,12 @@ void Agent::runChat(const std::string &userMessage,
                     std::string callKey = call.name + "|" + call.rawArguments;
 
                     if (!seenCalls.insert(callKey).second) {
-                        bool removed = false;
-                        std::string jsonKey = "\"function\": \"" + call.name + "\"";
-                        size_t pos = remaining.find(jsonKey);
-                        if (pos != std::string::npos) {
-                            size_t openBrace = remaining.rfind('{', pos);
-                            if (openBrace != std::string::npos) {
-                                size_t closeBrace = json_helper::findValueEnd(remaining, openBrace);
-                                if (closeBrace != std::string::npos) {
-                                    remaining = remaining.substr(0, openBrace) + remaining.substr(closeBrace);
-                                    removed = true;
-                                }
-                            }
-                        }
-                        if (!removed) {
-                            std::string gemmaKey = "call:" + call.name;
-                            pos = remaining.find(gemmaKey);
-                            if (pos != std::string::npos) {
-                                size_t openBrace = remaining.find('{', pos);
-                                if (openBrace != std::string::npos) {
-                                    size_t closeBrace = json_helper::findValueEnd(remaining, openBrace);
-                                    if (closeBrace != std::string::npos) {
-                                        remaining = remaining.substr(0, pos) + remaining.substr(closeBrace);
-                                        removed = true;
-                                    }
-                                }
-                            }
-                        }
-                        if (!removed) break;
+                        if (!removeCallText(remaining, call)) break;
                         continue;
                     }
 
                     if (call.name == "thought") {
-                        bool removed = false;
-                        std::string gemmaKey = "call:" + call.name;
-                        size_t gp = remaining.find(gemmaKey);
-                        if (gp != std::string::npos) {
-                            size_t openBrace = remaining.find('{', gp);
-                            if (openBrace != std::string::npos) {
-                                size_t closeBrace = json_helper::findValueEnd(remaining, openBrace);
-                                if (closeBrace != std::string::npos) {
-                                    remaining = remaining.substr(0, gp) + remaining.substr(closeBrace);
-                                    removed = true;
-                                }
-                            }
-                        }
-                        if (!removed) break;
+                        if (!removeCallText(remaining, call)) break;
                         continue;
                     }
 
@@ -728,34 +739,7 @@ void Agent::runChat(const std::string &userMessage,
                     toolCalled = true;
                     toolIter++;
 
-                    bool removed = false;
-                    std::string jsonKey = "\"function\": \"" + call.name + "\"";
-                    size_t pos = remaining.find(jsonKey);
-                    if (pos != std::string::npos) {
-                        size_t openBrace = remaining.rfind('{', pos);
-                        if (openBrace != std::string::npos) {
-                            size_t closeBrace = json_helper::findValueEnd(remaining, openBrace);
-                            if (closeBrace != std::string::npos) {
-                                remaining = remaining.substr(0, openBrace) + remaining.substr(closeBrace);
-                                removed = true;
-                            }
-                        }
-                    }
-                    if (!removed) {
-                        std::string gemmaKey = "call:" + call.name;
-                        pos = remaining.find(gemmaKey);
-                        if (pos != std::string::npos) {
-                            size_t openBrace = remaining.find('{', pos);
-                            if (openBrace != std::string::npos) {
-                                size_t closeBrace = json_helper::findValueEnd(remaining, openBrace);
-                                if (closeBrace != std::string::npos) {
-                                    remaining = remaining.substr(0, pos) + remaining.substr(closeBrace);
-                                    removed = true;
-                                }
-                            }
-                        }
-                    }
-                    if (!removed) break;
+                    if (!removeCallText(remaining, call)) break;
                 }
             }
 

@@ -13,6 +13,130 @@ inline size_t skipWhitespace(const std::string &s, size_t pos)
     return pos;
 }
 
+inline std::string trimCopy(const std::string &s)
+{
+    size_t a = skipWhitespace(s, 0);
+    size_t b = s.size();
+    while (b > a && (s[b - 1] == ' ' || s[b - 1] == '\t' || s[b - 1] == '\n' || s[b - 1] == '\r'))
+        --b;
+    return s.substr(a, b - a);
+}
+
+inline std::string escapeJsonString(const std::string &s)
+{
+    static const char *hex = "0123456789abcdef";
+    std::string out;
+    out.reserve(s.size() + 8);
+    for (unsigned char c : s) {
+        switch (c) {
+            case '"':  out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n";  break;
+            case '\r': out += "\\r";  break;
+            case '\t': out += "\\t";  break;
+            case '\b': out += "\\b";  break;
+            case '\f': out += "\\f";  break;
+            default:
+                if (c < 0x20) {
+                    out += "\\u00";
+                    out += hex[(c >> 4) & 0x0F];
+                    out += hex[c & 0x0F];
+                } else {
+                    out += static_cast<char>(c);
+                }
+        }
+    }
+    return out;
+}
+
+struct XmlToolCall
+{
+    std::string name;
+    std::string arguments;
+    size_t begin = std::string::npos;
+    size_t end   = std::string::npos;
+};
+
+// Qwen3.5/Qwen3.8 and Qwen3-Coder use:
+// <tool_call><function=name><parameter=key>value</parameter></function></tool_call>
+inline XmlToolCall extractXmlToolCall(const std::string &s, size_t from = 0)
+{
+    XmlToolCall out;
+
+    size_t fn = s.find("<function=", from);
+    if (fn == std::string::npos)
+        return out;
+
+    size_t fnEnd = s.find('>', fn);
+    if (fnEnd == std::string::npos)
+        return out;
+
+    std::string name = trimCopy(s.substr(fn + 10, fnEnd - fn - 10));
+    if (name.empty())
+        return out;
+
+    size_t fnClose = s.find("</function>", fnEnd);
+    if (fnClose == std::string::npos)
+        return out;
+
+    std::string args = "{";
+    bool first = true;
+    size_t pos = fnEnd + 1;
+    while (pos < fnClose) {
+        size_t open = s.find("<parameter=", pos);
+        if (open == std::string::npos || open >= fnClose)
+            break;
+
+        size_t keyEnd = s.find('>', open + 11);
+        if (keyEnd == std::string::npos || keyEnd >= fnClose)
+            break;
+
+        size_t valueEnd = s.find("</parameter>", keyEnd + 1);
+        if (valueEnd == std::string::npos || valueEnd > fnClose)
+            break;
+
+        std::string key = trimCopy(s.substr(open + 11, keyEnd - open - 11));
+        std::string value = s.substr(keyEnd + 1, valueEnd - keyEnd - 1);
+
+        // The template puts every value on its own line. Strip only that
+        // layout newline so multiline content keeps its internal formatting.
+        if (value.size() >= 2 && value[0] == '\r' && value[1] == '\n')
+            value.erase(0, 2);
+        else if (!value.empty() && value[0] == '\n')
+            value.erase(0, 1);
+        if (!value.empty() && value.back() == '\n')
+            value.pop_back();
+        if (!value.empty() && value.back() == '\r')
+            value.pop_back();
+
+        if (!first)
+            args += ", ";
+        first = false;
+        args += "\"" + escapeJsonString(key) + "\": \"" + escapeJsonString(value) + "\"";
+
+        pos = valueEnd + 12;
+    }
+    args += "}";
+
+    size_t callOpen = s.rfind("<tool_call>", fn);
+    if (callOpen != std::string::npos) {
+        size_t previousClose = s.find("</tool_call>", callOpen);
+        if (previousClose != std::string::npos && previousClose < fn)
+            callOpen = std::string::npos;
+    }
+    size_t callClose = (callOpen == std::string::npos) ? std::string::npos
+                                                       : s.find("</tool_call>", fn);
+
+    out.name = name;
+    out.arguments = args;
+    out.begin = (callOpen == std::string::npos) ? fn : callOpen;
+    if (callOpen != std::string::npos && callClose != std::string::npos)
+        out.end = callClose + 12;
+    else
+        out.end = fnClose + 11;
+    return out;
+}
+
 inline size_t findStringEnd(const std::string &s, size_t pos)
 {
     if (pos >= s.size() || s[pos] != '"') return pos;
