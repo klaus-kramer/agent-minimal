@@ -85,7 +85,7 @@ Linux - `make` (or `ninja`), `pkg-config`, `libcurl` (for web tools)
 
 ## Tested With
 create models directory and download model. Developed and tested against:    
-gemma4-12B    
+gemma-4 12B, gemma-4 26b    
 qwen3.8 27b    
 Other models may work but are used without guarantees – template detection heuristics may not cover all formats.    
 
