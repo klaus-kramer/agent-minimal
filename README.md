@@ -93,5 +93,5 @@ Other models may work but are used without guarantees – template detection heu
 
 ## links:    
 ai Grimmelshausen https://huggingface.co/Klaus-Kramer/Grimmelshausen    
-tool Vigil-Fluminis for Windows-security https://github.com/klaus-kramer/Vigil-Fluminis    
+  
 
