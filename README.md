@@ -2,12 +2,11 @@
 A minimal, embeddable C++ local AI agent built on llama.cpp. It demonstrates tool calling and a clean architecture without heavy dependencies.
 
 
-## Features v0.3.4
+## Features v0.3.5
 - Local LLM chat – Load GGUF model and chat interactively (atm recommended gemma4)    
 - Tool/function calling – Built-in file I/O, web fetch/search,  pattern search, command execution    
 - CUDA GPU acceleration – Automatic detection and enablement     
 - Interactive CLI – slash commands, parameter tuning, session management    
-v0.3.0: new CLI-parameter --reasoning-effort and --template-kwarg
 
 ## Key Points:
 - Embeddable C++ library - `libagent_core` can be linked into any C++ application via `#include <core/Agent.h>`    
@@ -88,6 +87,11 @@ create models directory and download model. Developed and tested against:
 gemma-4 12B, gemma-4 26b    
 qwen3.8 27b    
 Other models may work but are used without guarantees – template detection heuristics may not cover all formats.    
+
+## changehistory:
+v0.3.0: new CLI-parameter --reasoning-effort and --template-kwarg    
+v0.3.1-v0.3.4: terminated bugs    
+v0.3.5: FileTool: writefile > 100kb now possible    
 
 ## License: MIT - Copyright (c) 2026 Klaus Kramer
 
