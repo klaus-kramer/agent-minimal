@@ -94,8 +94,6 @@ v0.3.1-v0.3.4: terminated bugs
 v0.3.5: FileTool: writefile > 100kb now possible    
 
 ## License: MIT - Copyright (c) 2026 Klaus Kramer
-
-## links:    
-ai Grimmelshausen https://huggingface.co/Klaus-Kramer/Grimmelshausen    
+ 
   
 
