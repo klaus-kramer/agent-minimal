@@ -9,7 +9,10 @@
 namespace fs = std::filesystem;
 
 static constexpr size_t MAX_FILE_TOOL_BYTES = 102400;
-static constexpr size_t MAX_WRITE_TOOL_BYTES = 102400;
+// The write tool is no longer limited to 100 KB. Content is bounded by what
+// the model can generate anyway; this is only a sanity guard against absurd
+// inputs. Large files should be written in several calls using append=true.
+static constexpr size_t MAX_WRITE_TOOL_BYTES = 64ull * 1024 * 1024;
 
 static fs::path &getAllowedRoot()
 {
@@ -201,12 +204,20 @@ static ToolResult listDirTool(const ToolCall& call)
     return {true, os.str()};
 }
 
+static bool hasToolArg(const std::string &rawArgs, const std::string &key);
+
 static ToolResult writeFileTool(const ToolCall& call)
 {
     std::string path = json_helper::extractToolArg(call.rawArguments, "path");
     std::string content = json_helper::extractToolArg(call.rawArguments, "content");
+    std::string appendStr = json_helper::extractToolArg(call.rawArguments, "append");
+    bool append = (appendStr == "true" || appendStr == "1");
+
     if (path.empty()) return {false, "Missing parameter: path"};
-    if (content.empty()) return {false, "Missing parameter: content"};
+    // An explicitly empty content is valid (it creates/truncates an empty
+    // file), so distinguish it from a key that was not supplied at all.
+    if (!hasToolArg(call.rawArguments, "content"))
+        return {false, "Missing parameter: content"};
     if (content.size() > MAX_WRITE_TOOL_BYTES)
         return {false, "Content too large (" + std::to_string(content.size()) + " bytes). Max " + std::to_string(MAX_WRITE_TOOL_BYTES) + " bytes."};
 
@@ -224,16 +235,28 @@ static ToolResult writeFileTool(const ToolCall& call)
             return {false, "Failed to create parent directories: " + ec.message()};
     }
 
-    std::ofstream f(fp, std::ios::binary);
+    std::ios::openmode mode = std::ios::binary | std::ios::out;
+    if (append) mode |= std::ios::app;
+
+    std::ofstream f(fp, mode);
     if (!f) return {false, "Could not open file for writing: " + path};
 
     f.write(content.data(), static_cast<std::streamsize>(content.size()));
     if (!f) return {false, "Failed to write to file: " + path};
 
+    f.close();
+    if (!f) return {false, "Failed to flush file: " + path};
+
     size_t written = content.size();
     std::ostringstream os;
-    os << "File written: " << fp.string() << "\n";
-    os << "Size: " << written << " bytes\n";
+    os << (append ? "Appended to file: " : "File written: ") << fp.string() << "\n";
+    os << (append ? "Appended: " : "Size: ") << written << " bytes\n";
+    if (append) {
+        std::error_code ec;
+        auto total = fs::file_size(fp, ec);
+        if (!ec)
+            os << "Total size: " << total << " bytes\n";
+    }
     return {true, os.str()};
 }
 
@@ -358,10 +381,15 @@ void registerFileTools(ToolRegistry& registry)
 
     ToolDefinition writeDef;
     writeDef.name = "write_file";
-    writeDef.description = "Write content to a file. Creates parent directories if needed. Maximum 100 KB. Restricted to the project directory.";
+    writeDef.description =
+        "Write content to a file. Creates parent directories if needed. Restricted to the project directory. "
+        "There is no 100 KB limit. For large files, write the first chunk with append=false, then append "
+        "each following chunk with append=true. Keep each call small enough to fit in one model response "
+        "(roughly 50-100 lines or a few KB); do not try to emit a huge file in a single call.";
     writeDef.parameters = {
         {"path", "The path to the file (relative or absolute, within project)", "string", true},
-        {"content", "The content to write to the file", "string", true}
+        {"content", "The content to write to the file", "string", true},
+        {"append", "If true, append the content to the end of the file instead of overwriting it (default: false)", "boolean", false}
     };
     writeDef.requiresConfirmation = true;
     registry.registerTool(writeDef, writeFileTool);
